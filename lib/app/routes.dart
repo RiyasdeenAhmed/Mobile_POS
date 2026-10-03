@@ -8,6 +8,7 @@ import '../features/customers/presentation/customer_form_screen.dart';
 import '../features/customers/presentation/customers_screen.dart';
 import '../features/dashboard/presentation/more_screen.dart';
 import '../features/inventory/presentation/inventory_screen.dart';
+import '../features/inventory/presentation/stock_adjust_screen.dart';
 import '../features/pos/presentation/cart_screen.dart';
 import '../features/pos/presentation/new_sale_screen.dart';
 import '../features/products/presentation/product_form_screen.dart';
@@ -40,6 +41,7 @@ class AppRoutes {
   static const String customerAccount = '/customers/account';
   static const String customerForm = '/customers/form';
   static const String inventory = '/inventory';
+  static const String stockAdjust = '/inventory/adjust';
   static const String more = '/more';
   static const String settings = '/settings';
 }
@@ -142,6 +144,13 @@ class AppRouter {
           settings: settings,
           builder: (_) => const InventoryScreen(),
         );
+      case AppRoutes.stockAdjust:
+        final productUuid =
+            settings.arguments is String ? settings.arguments! as String : '';
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => StockAdjustScreen(productUuid: productUuid),
+        );
       case AppRoutes.more:
         return MaterialPageRoute<void>(
           settings: settings,
@@ -242,6 +251,10 @@ class AppNavigator {
 
   static Future<T?> toInventory<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.inventory);
+
+  static Future<T?> toStockAdjust<T>(BuildContext context,
+          {required String productUuid}) =>
+      pushNamed<T>(context, AppRoutes.stockAdjust, arguments: productUuid);
 
   static Future<T?> toMore<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.more);

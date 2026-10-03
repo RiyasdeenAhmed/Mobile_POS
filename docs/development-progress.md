@@ -108,13 +108,15 @@ Nothing is marked complete without implementation and test evidence.
 
 ## M4 — Inventory and stock movements
 
-- [ ] Fix `adjustStock` sign defect (out-movements must decrease stock)
-- [ ] `StockMovementRepository` (by product, by date, low-stock query)
-- [ ] Inventory screen with stock levels and low-stock badges
-- [ ] Stock movement history per product
-- [ ] Stock adjustment dialog (type, quantity, required note)
-- [ ] Honour `allow_negative_stock` setting
-- [ ] Tests: adjustment in/out, negative guard, movement rows, low-stock query
+- [x] Fix `adjustStock` sign defect: sign enforced per movement type (`adjustment_in`/`purchase`/`sale_return`/`opening_stock` positive, `adjustment_out`/`damage` negative); moved to `StockMovementRepository`
+- [x] Manual adjustments (`adjustment_in`/`adjustment_out`/`damage`) require a non-empty note
+- [x] `StockMovementRepository` (list by product, list recent with product join, `lowStockProducts`/`lowStockCount`)
+- [x] Inventory screen with Low stock / All products tabs, status colours + text, reorder info
+- [x] Stock movement history per product (inside the adjust screen)
+- [x] Stock adjustment screen at `/inventory/adjust` (type, signed preview, required note, admin-only form, read-only for cashiers)
+- [x] Honour `allow_negative_stock` setting (read inside the movement transaction)
+- [x] Products screen menu gained "Adjust stock" (reloads on return)
+- [x] Tests: adjustment in/out signs, wrong-sign rejection, note guard, negative guard + setting override, movement rows, staff uuid, low-stock query, recent list join, adjust-screen widget tests
 
 ## M5 — POS and cart
 

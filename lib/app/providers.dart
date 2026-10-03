@@ -8,6 +8,7 @@ import '../../features/categories/data/category_repository.dart';
 import '../../features/checkout/data/checkout_service.dart';
 import '../../features/customers/data/customer_repository.dart';
 import '../../features/pos/domain/cart_controller.dart';
+import '../../features/inventory/data/stock_movement_repository.dart';
 import '../../features/products/data/product_repository.dart';
 import '../../features/sales/data/sale_repository.dart';
 import '../../features/staff/application/staff_session.dart';
@@ -27,6 +28,9 @@ List<SingleChildWidget> buildAppProviders(
     ),
     ProxyProvider<AppDatabase, CategoryRepository>(
       update: (_, db, __) => CategoryRepository(db),
+    ),
+    ProxyProvider<AppDatabase, StockMovementRepository>(
+      update: (_, db, __) => StockMovementRepository(db),
     ),
     ProxyProvider<AppDatabase, CustomerRepository>(
       update: (_, db, __) => CustomerRepository(db),

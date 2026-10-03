@@ -327,17 +327,26 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                       ),
                                       trailing: PopupMenuButton<String>(
                                         tooltip: 'Product actions',
-                                        onSelected: (value) {
+                                        onSelected: (value) async {
                                           if (value == 'edit') {
-                                            _openForm(product: product);
+                                            await _openForm(product: product);
+                                          } else if (value == 'adjust') {
+                                            await AppNavigator.toStockAdjust(
+                                              context,
+                                              productUuid: product.uuid,
+                                            );
+                                            if (mounted) await _load();
                                           } else if (value == 'archive') {
-                                            _archive(product);
+                                            await _archive(product);
                                           }
                                         },
                                         itemBuilder: (_) => const [
                                           PopupMenuItem<String>(
                                               value: 'edit',
                                               child: Text('Edit')),
+                                          PopupMenuItem<String>(
+                                              value: 'adjust',
+                                              child: Text('Adjust stock')),
                                           PopupMenuItem<String>(
                                               value: 'archive',
                                               child: Text('Archive')),
