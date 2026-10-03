@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/auth/presentation/change_pin_screen.dart';
+import '../features/barcode/presentation/scan_screen.dart';
 import '../features/categories/presentation/categories_screen.dart';
 import '../features/checkout/presentation/checkout_screen.dart';
 import '../features/customers/presentation/customer_account_screen.dart';
@@ -30,6 +31,7 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String newSale = '/pos/new-sale';
   static const String cart = '/pos/cart';
+  static const String scan = '/pos/scan';
   static const String checkout = '/checkout';
   static const String receipt = '/receipt';
   static const String sales = '/sales';
@@ -80,6 +82,11 @@ class AppRouter {
         return MaterialPageRoute<void>(
           settings: settings,
           builder: (_) => const CartScreen(),
+        );
+      case AppRoutes.scan:
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const ScanScreen(),
         );
       case AppRoutes.checkout:
         return MaterialPageRoute<void>(
@@ -212,6 +219,9 @@ class AppNavigator {
 
   static Future<T?> toCart<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.cart);
+
+  static Future<T?> toScan<T>(BuildContext context) =>
+      pushNamed<T>(context, AppRoutes.scan);
 
   static Future<T?> toCheckout<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.checkout);

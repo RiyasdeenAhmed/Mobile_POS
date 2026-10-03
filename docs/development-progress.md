@@ -41,7 +41,7 @@ Nothing is marked complete without implementation and test evidence.
 ## Packages
 
 - [x] Add `cryptography: ^2.9.0` (PBKDF2-HMAC-SHA256) — M2
-- [ ] Add `mobile_scanner: ^7.4.2` (barcode camera) — M8
+- [x] Add `mobile_scanner: ^7.4.2` (barcode camera) — M8
 - [x] Verify `flutter pub get` and `flutter analyze` after each addition
 
 ---
@@ -162,15 +162,15 @@ Nothing is marked complete without implementation and test evidence.
 
 ## M8 — Barcode scanning
 
-- [ ] `BarcodeScanner` interface, `mobile_scanner` implementation, and fake
-- [ ] Scan screen with camera preview
-- [ ] Scan to add-to-cart flow via `findByBarcode`
-- [ ] Debounce rapid repeated scans
-- [ ] Flashlight toggle
-- [ ] Camera permission handling with graceful denial
-- [ ] Android `CAMERA` permission, iOS `NSCameraUsageDescription`
-- [ ] "Product not found" message path
-- [ ] Tests: fake scanner add-to-cart, not found, debounce
+- [x] `BarcodeScanner` interface, `mobile_scanner` implementation, and fake
+- [x] Scan screen with camera preview
+- [x] Scan to add-to-cart flow via `findByBarcode`
+- [x] Debounce rapid repeated scans
+- [x] Flashlight toggle
+- [x] Camera permission handling with graceful denial
+- [x] Android `CAMERA` permission, iOS `NSCameraUsageDescription`
+- [x] "Product not found" message path
+- [x] Tests: fake scanner add-to-cart, not found, debounce, permission denied, manual entry (5 widget)
 
 ## M9 — Receipts and thermal printing
 

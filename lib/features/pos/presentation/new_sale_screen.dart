@@ -91,6 +91,11 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         title: const Text('New Sale'),
         actions: [
           IconButton(
+            tooltip: 'Scan',
+            onPressed: () => AppNavigator.toScan(context),
+            icon: const Icon(Icons.qr_code_scanner),
+          ),
+          IconButton(
             tooltip: 'Cart',
             onPressed: () => AppNavigator.toCart(context),
             icon: Badge(
