@@ -96,16 +96,15 @@ Nothing is marked complete without implementation and test evidence.
 
 ## M3 — Categories and product management UI
 
-- [ ] Category list with real data
-- [ ] Category create/edit form
-- [ ] Category archive with dependency guard
-- [ ] Product edit mode (route argument, prefill, `update`)
-- [ ] Product form: category, stock, reorder level, track stock, description
-- [ ] Migration v4 `products.description`
-- [ ] Product search bar, category filter, low-stock filter
-- [ ] Product archive/disable action with confirmation
-- [ ] Stock status colours (in stock green, low orange, out red)
-- [ ] Tests: category CRUD, product update, search and filters
+- [x] Category list with real data (add/edit dialog, parent picker, archived styling)
+- [x] Category create/edit form
+- [x] Category archive with dependency guard (`productCount` blocks archive while active products reference it; FK-safe `invalid_parent` error on stale parent)
+- [x] Product edit mode (route argument `productUuid`, prefill, `repository.update`)
+- [x] Product form: category picker, opening stock (create only; edit shows current stock read-only), reorder level, track stock switch
+- [x] Product search bar (name/SKU/barcode), category filter, low-stock filter (low + out of stock)
+- [x] Product archive action with confirmation
+- [x] Stock status colours with text (in stock green, low orange, out red, not tracked grey)
+- [x] Tests: category CRUD/duplicate/guard, product update keeps stock, search, form widget create/edit/validation
 
 ## M4 — Inventory and stock movements
 
@@ -189,7 +188,7 @@ Nothing is marked complete without implementation and test evidence.
 - [ ] `SaleRepository` filters: date range, payment method, customer
 - [ ] Sales screen filter UI
 - [ ] Migration v3 `returns_foundation` (`returns`, `return_items`, indexes, foreign keys)
-- [ ] Migration v4 `payments.customer_id`
+- [ ] Migration v4 `product_and_payment_details` (`payments.customer_id`, `products.description`, safe `payments` rebuild)
 - [ ] `ReturnService` (atomic return, `sale_return` stock restore, ledger adjust, quantity guard)
 - [ ] Tests: dashboard metrics, sales filters, return quantity guard, return rollback, stock restore
 

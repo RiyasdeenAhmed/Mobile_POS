@@ -109,9 +109,11 @@ class AppRouter {
           builder: (_) => const ProductsScreen(),
         );
       case AppRoutes.productForm:
+        final productUuid =
+            settings.arguments is String ? settings.arguments! as String : null;
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const ProductFormScreen(),
+          builder: (_) => ProductFormScreen(productUuid: productUuid),
         );
       case AppRoutes.categories:
         return MaterialPageRoute<void>(
@@ -215,8 +217,9 @@ class AppNavigator {
   static Future<T?> toProducts<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.products);
 
-  static Future<T?> toProductForm<T>(BuildContext context) =>
-      pushNamed<T>(context, AppRoutes.productForm);
+  static Future<T?> toProductForm<T>(BuildContext context,
+          {String? productUuid}) =>
+      pushNamed<T>(context, AppRoutes.productForm, arguments: productUuid);
 
   static Future<T?> toCategories<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.categories);

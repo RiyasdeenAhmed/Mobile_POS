@@ -32,7 +32,7 @@ Rules:
 | 1 | `foundation` | All core tables, indexes, and settings defaults |
 | 2 | `auth_and_store_settings` | *(M2)* `staff_users.must_change_pin`; settings for LKR, invoice prefix, receipt footer, tax, negative stock, printer |
 | 3 | `returns_foundation` | *(M10)* `returns`, `return_items` |
-| 4 | `product_and_payment_details` | *(M3/M10)* `products.description`, `payments.customer_id` |
+| 4 | `product_and_payment_details` | *(M10)* `products.description`, `payments.customer_id` |
 
 ## Money strategy
 
@@ -92,7 +92,7 @@ development seed account to rotate its PIN on first login.
 `id`, `uuid` (UNIQUE), `name`, `parent_id` (FK → `categories`, SET NULL), `sort_order`, `is_active`, `is_archived`, `created_at`, `updated_at`
 
 ### `products`
-`id`, `uuid` (UNIQUE), `sku` (UNIQUE), `barcode` (UNIQUE), `name`, `category_id` (FK → `categories`, SET NULL), `cost_price_minor`, `selling_price_minor`, `currency`, `stock_quantity` REAL, `reorder_level` REAL, `track_stock`, `is_active`, `is_archived`, `description` *(M3)*, `created_at`, `updated_at`
+`id`, `uuid` (UNIQUE), `sku` (UNIQUE), `barcode` (UNIQUE), `name`, `category_id` (FK → `categories`, SET NULL), `cost_price_minor`, `selling_price_minor`, `currency`, `stock_quantity` REAL, `reorder_level` REAL, `track_stock`, `is_active`, `is_archived`, `description` *(M10, migration v4)*, `created_at`, `updated_at`
 
 `track_stock = 0` means the product is not inventory-controlled (e.g. services):
 sales do not decrement stock and write no stock movement. `is_archived` is a
