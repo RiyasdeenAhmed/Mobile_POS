@@ -102,12 +102,12 @@ Business logic:
 - [x] Completed sale persistence
 - [x] Sale rollback on mid-transaction failure
 - [x] Customer credit ledger entry
-- [ ] Customer repayment and overpayment rejection *(M7)*
+- [x] Customer repayment and overpayment rejection *(M7)*
 - [x] Invoice number generation and uniqueness
 - [x] Barcode product lookup
 - [x] Historical price snapshots survive product edits
-- [ ] Balance-to-ledger invariant *(M7)*
-- [ ] Stock adjustment sign handling *(M4)*
+- [x] Balance-to-ledger invariant *(M7)*
+- [x] Stock adjustment sign handling *(M4)*
 - [ ] Returns quantity guard and stock restore *(M10)*
 
 Checkout regression cases:

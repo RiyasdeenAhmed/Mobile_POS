@@ -135,9 +135,11 @@ class AppRouter {
           builder: (_) => CustomerAccountScreen(customerUuid: customerUuid),
         );
       case AppRoutes.customerForm:
+        final customerUuid =
+            settings.arguments is String ? settings.arguments! as String : null;
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const CustomerFormScreen(),
+          builder: (_) => CustomerFormScreen(customerUuid: customerUuid),
         );
       case AppRoutes.inventory:
         return MaterialPageRoute<void>(
@@ -246,8 +248,9 @@ class AppNavigator {
         arguments: customerUuid,
       );
 
-  static Future<T?> toCustomerForm<T>(BuildContext context) =>
-      pushNamed<T>(context, AppRoutes.customerForm);
+  static Future<T?> toCustomerForm<T>(BuildContext context,
+          {String? customerUuid}) =>
+      pushNamed<T>(context, AppRoutes.customerForm, arguments: customerUuid);
 
   static Future<T?> toInventory<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.inventory);

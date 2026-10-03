@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/theme/money_text.dart';
+import '../../../core/utils/result.dart';
 import '../data/customer_repository.dart';
 import '../domain/customer.dart';
 
 class CustomerFormScreen extends StatefulWidget {
-  const CustomerFormScreen({super.key});
+  final String? customerUuid;
+
+  const CustomerFormScreen({super.key, this.customerUuid});
 
   @override
   State<CustomerFormScreen> createState() => _CustomerFormScreenState();
@@ -17,7 +21,56 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _addressController = TextEditingController();
+  final _creditLimitController = TextEditingController();
+  Customer? _customer;
+  bool _loading = false;
   bool _saving = false;
+
+  bool get _isEdit => widget.customerUuid != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEdit) {
+      _loading = true;
+      _loadCustomer();
+    }
+  }
+
+  Future<void> _loadCustomer() async {
+    final repository = context.read<CustomerRepository>();
+    final customer = await repository.findByUuid(widget.customerUuid!);
+    if (!mounted) return;
+    if (customer == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    setState(() {
+      _customer = customer;
+      _loading = false;
+      _nameController.text = customer.name;
+      _phoneController.text = customer.phone ?? '';
+      _emailController.text = customer.email ?? '';
+      _addressController.text = customer.address ?? '';
+      _creditLimitController.text = _majorString(customer.creditLimitMinor);
+    });
+  }
+
+  static String _majorString(int minor) {
+    final major = minor ~/ 100;
+    final cents = (minor % 100).toString().padLeft(2, '0');
+    return '$major.$cents';
+  }
+
+  int? _parseCreditLimit(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return 0;
+    try {
+      return MoneyFormat.parseMajorToMinor(trimmed);
+    } on FormatException {
+      return null;
+    }
+  }
 
   @override
   void dispose() {
@@ -25,25 +78,56 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _addressController.dispose();
+    _creditLimitController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final creditLimitMinor = _parseCreditLimit(_creditLimitController.text);
+    if (creditLimitMinor == null || creditLimitMinor < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credit limit cannot be negative')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     final repository = context.read<CustomerRepository>();
-    final result = await repository.create(
-      name: _nameController.text,
-      phone: _phoneController.text,
-      email: _emailController.text,
-      address: _addressController.text,
-    );
+    final AppResult<Customer> result;
+    if (_isEdit) {
+      final existing = _customer;
+      if (existing == null) {
+        setState(() => _saving = false);
+        return;
+      }
+      result = await repository.update(
+        existing.copyWith(
+          name: _nameController.text,
+          phone: _phoneController.text,
+          email: _emailController.text,
+          address: _addressController.text,
+          creditLimitMinor: creditLimitMinor,
+        ),
+      );
+    } else {
+      result = await repository.create(
+        name: _nameController.text,
+        phone: _phoneController.text,
+        email: _emailController.text,
+        address: _addressController.text,
+        creditLimitMinor: creditLimitMinor,
+      );
+    }
     if (!mounted) return;
     setState(() => _saving = false);
     result.when(
       success: (Customer customer) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added ${customer.name}')),
+          SnackBar(
+            content: Text(_isEdit
+                ? 'Updated ${customer.name}'
+                : 'Added ${customer.name}'),
+          ),
         );
         Navigator.of(context).pop(true);
       },
@@ -57,8 +141,20 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Edit customer')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_isEdit && _customer == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Edit customer')),
+        body: const Center(child: Text('Customer not found')),
+      );
+    }
     return Scaffold(
-      appBar: AppBar(title: const Text('New customer')),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit customer' : 'New customer')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -92,6 +188,22 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               decoration:
                   const InputDecoration(labelText: 'Address (optional)'),
               maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _creditLimitController,
+              decoration: const InputDecoration(
+                labelText: 'Credit limit (optional)',
+                helperText: 'Major units, e.g. 500.00',
+              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              validator: (value) {
+                final parsed = _parseCreditLimit(value ?? '');
+                if (parsed == null) return 'Invalid amount';
+                if (parsed < 0) return 'Credit limit cannot be negative';
+                return null;
+              },
             ),
             const SizedBox(height: 24),
             ElevatedButton(

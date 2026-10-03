@@ -57,6 +57,9 @@ class CustomerRepository {
     if (trimmedName.isEmpty) {
       return failure('Customer name is required', code: 'validation');
     }
+    if (customer.creditLimitMinor < 0) {
+      return failure('Credit limit cannot be negative', code: 'validation');
+    }
     final updated = customer.copyWith(
       name: trimmedName,
       phone: _normalizeOptional(customer.phone),

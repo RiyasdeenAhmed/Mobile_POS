@@ -6,7 +6,9 @@ import '../../core/database/settings_repository.dart';
 import '../../core/security/pin_hasher.dart';
 import '../../features/categories/data/category_repository.dart';
 import '../../features/checkout/data/checkout_service.dart';
+import '../../features/customers/data/customer_ledger_repository.dart';
 import '../../features/customers/data/customer_repository.dart';
+import '../../features/customers/data/repayment_service.dart';
 import '../../features/pos/domain/cart_controller.dart';
 import '../../features/inventory/data/stock_movement_repository.dart';
 import '../../features/products/data/product_repository.dart';
@@ -34,6 +36,12 @@ List<SingleChildWidget> buildAppProviders(
     ),
     ProxyProvider<AppDatabase, CustomerRepository>(
       update: (_, db, __) => CustomerRepository(db),
+    ),
+    ProxyProvider<AppDatabase, CustomerLedgerRepository>(
+      update: (_, db, __) => CustomerLedgerRepository(db),
+    ),
+    ProxyProvider<AppDatabase, RepaymentService>(
+      update: (_, db, __) => RepaymentService(db),
     ),
     ProxyProvider<AppDatabase, SaleRepository>(
       update: (_, db, __) => SaleRepository(db),

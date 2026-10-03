@@ -150,15 +150,15 @@ Nothing is marked complete without implementation and test evidence.
 
 - [x] Customer repository and list screen
 - [x] Credit checkout writes ledger and updates balance
-- [ ] Customer edit mode
-- [ ] Credit limit field in customer form
-- [ ] Customer archive action
-- [ ] `CustomerLedgerRepository`
-- [ ] `RepaymentService` (atomic ledger entry and balance update, overpayment guard)
-- [ ] Ledger table UI (date, type, reference, debit, credit, balance)
-- [ ] Ledger colours: debt red, payment green
-- [ ] Record repayment dialog (amount and method)
-- [ ] Tests: repayment math, overpayment rejected, ledger preserved, balance-to-ledger invariant
+- [x] Customer edit mode
+- [x] Credit limit field in customer form
+- [x] Customer archive action
+- [x] `CustomerLedgerRepository`
+- [x] `RepaymentService` (atomic ledger entry and balance update, overpayment guard)
+- [x] Ledger table UI (date, type, reference, debit, credit, balance)
+- [x] Ledger colours: debt red, payment green
+- [x] Record repayment dialog (amount and method)
+- [x] Tests: repayment math, overpayment rejected, ledger preserved, balance-to-ledger invariant (5 unit + 4 widget)
 
 ## M8 — Barcode scanning
 
