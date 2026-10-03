@@ -39,12 +39,35 @@ class SaleRepository {
     return Sale.fromMap(rows.first);
   }
 
-  Future<List<Sale>> list({String? status, int limit = 50}) async {
+  Future<List<Sale>> list({
+    String? status,
+    int limit = 50,
+    DateTime? from,
+    DateTime? to,
+    String? paymentMethod,
+    int? customerId,
+  }) async {
     final whereParts = <String>[];
     final whereArgs = <Object>[];
     if (status != null && status.isNotEmpty) {
       whereParts.add('status = ?');
       whereArgs.add(status);
+    }
+    if (from != null) {
+      whereParts.add('sale_at >= ?');
+      whereArgs.add(from.toIso8601String());
+    }
+    if (to != null) {
+      whereParts.add('sale_at < ?');
+      whereArgs.add(to.toIso8601String());
+    }
+    if (paymentMethod != null && paymentMethod.isNotEmpty) {
+      whereParts.add('payment_method = ?');
+      whereArgs.add(paymentMethod);
+    }
+    if (customerId != null) {
+      whereParts.add('customer_id = ?');
+      whereArgs.add(customerId);
     }
     final rows = await database.db.query(
       'sales',

@@ -9,12 +9,14 @@ import '../../features/checkout/data/checkout_service.dart';
 import '../../features/customers/data/customer_ledger_repository.dart';
 import '../../features/customers/data/customer_repository.dart';
 import '../../features/customers/data/repayment_service.dart';
+import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/pos/domain/cart_controller.dart';
 import '../../features/inventory/data/stock_movement_repository.dart';
 import '../../features/products/data/product_repository.dart';
 import '../../features/receipts/data/mock_printer.dart';
 import '../../features/receipts/data/printer_service.dart';
 import '../../features/receipts/data/receipt_print_service.dart';
+import '../../features/sales/data/return_service.dart';
 import '../../features/sales/data/sale_repository.dart';
 import '../../features/staff/application/staff_session.dart';
 import '../../features/staff/data/staff_repository.dart';
@@ -48,6 +50,12 @@ List<SingleChildWidget> buildAppProviders(
     ),
     ProxyProvider<AppDatabase, SaleRepository>(
       update: (_, db, __) => SaleRepository(db),
+    ),
+    ProxyProvider<AppDatabase, ReturnService>(
+      update: (_, db, __) => ReturnService(db),
+    ),
+    ProxyProvider<AppDatabase, DashboardRepository>(
+      update: (_, db, __) => DashboardRepository(db),
     ),
     ProxyProvider<AppDatabase, StaffRepository>(
       update: (_, db, __) => StaffRepository(db, pinIterations: pinIterations),

@@ -188,14 +188,14 @@ Nothing is marked complete without implementation and test evidence.
 
 ## M10 — Dashboard, sales history, returns foundation
 
-- [ ] `DashboardRepository` with real metrics (today sales, transaction count, credit outstanding, low stock)
-- [ ] Dashboard metric cards and recent transactions from queries
-- [ ] `SaleRepository` filters: date range, payment method, customer
-- [ ] Sales screen filter UI
-- [ ] Migration v3 `returns_foundation` (`returns`, `return_items`, indexes, foreign keys)
-- [ ] Migration v4 `product_and_payment_details` (`payments.customer_id`, `products.description`, safe `payments` rebuild)
-- [ ] `ReturnService` (atomic return, `sale_return` stock restore, ledger adjust, quantity guard)
-- [ ] Tests: dashboard metrics, sales filters, return quantity guard, return rollback, stock restore
+- [x] `DashboardRepository` with real metrics (today sales, transaction count, credit outstanding, low stock)
+- [x] Dashboard metric cards and recent transactions from queries
+- [x] `SaleRepository` filters: date range, payment method, customer
+- [x] Sales screen filter UI (Today/Yesterday/Last 7 days/All time + All/Cash/Card/Credit chips)
+- [x] Migration v3 `returns_foundation` (`returns`, `return_items`, indexes, foreign keys)
+- [x] Migration v4 `product_and_payment_details` (`payments.customer_id`, `products.description`, safe `payments` rebuild)
+- [x] `ReturnService` (atomic return, `sale_return` stock restore, ledger adjust, quantity guard)
+- [x] Tests: dashboard metrics, sales filters, return quantity guard, return rollback, stock restore, credit-return ledger, v2→v4 migration survival (14 tests)
 
 ## M11 — Settings, seed data, cleanup, documentation
 

@@ -247,8 +247,11 @@ class CheckoutService {
               currency: item.currency,
               createdAt: now,
             );
-            await txn.insert('sale_items', saleItem.toMap()..remove('id'));
-            itemIds.add(saleItem);
+            final saleItemId = await txn.insert(
+              'sale_items',
+              saleItem.toMap()..remove('id'),
+            );
+            itemIds.add(saleItem.copyWith(id: saleItemId));
           }
 
           final payment = Payment(

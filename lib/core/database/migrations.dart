@@ -24,10 +24,120 @@ const MigrationStep migrationV2 = MigrationStep(
   up: _migrateToV2,
 );
 
+const MigrationStep migrationV3 = MigrationStep(
+  version: 3,
+  name: 'returns_foundation',
+  up: _migrateToV3,
+);
+
+const MigrationStep migrationV4 = MigrationStep(
+  version: 4,
+  name: 'product_and_payment_details',
+  up: _migrateToV4,
+);
+
 const List<MigrationStep> kMigrations = <MigrationStep>[
   migrationV1,
   migrationV2,
+  migrationV3,
+  migrationV4,
 ];
+
+Future<void> _migrateToV3(DatabaseExecutor db) async {
+  await db.execute('''
+    CREATE TABLE returns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sale_id INTEGER NOT NULL,
+      sale_uuid TEXT NOT NULL,
+      customer_id INTEGER,
+      staff_uuid TEXT,
+      status TEXT NOT NULL DEFAULT 'completed',
+      refund_total_minor INTEGER NOT NULL,
+      refund_method TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE RESTRICT,
+      FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE SET NULL
+    )
+  ''');
+  await db.execute('CREATE INDEX idx_returns_sale_id ON returns(sale_id)');
+  await db
+      .execute('CREATE INDEX idx_returns_created_at ON returns(created_at)');
+
+  await db.execute('''
+    CREATE TABLE return_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      return_id INTEGER NOT NULL,
+      sale_item_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      product_uuid TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      unit_refund_minor INTEGER NOT NULL,
+      line_refund_minor INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (return_id) REFERENCES returns (id) ON DELETE CASCADE,
+      FOREIGN KEY (sale_item_id) REFERENCES sale_items (id) ON DELETE RESTRICT,
+      FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
+    )
+  ''');
+  await db.execute(
+    'CREATE INDEX idx_return_items_return_id ON return_items(return_id)',
+  );
+  await db.execute(
+    'CREATE INDEX idx_return_items_sale_item_id ON return_items(sale_item_id)',
+  );
+  await db.execute(
+    'CREATE INDEX idx_return_items_product_id ON return_items(product_id)',
+  );
+}
+
+Future<void> _migrateToV4(DatabaseExecutor db) async {
+  await db.execute('ALTER TABLE products ADD COLUMN description TEXT');
+
+  // payments gains customer_id. SQLite's legacy table-rebuild pattern: create
+  // the new shape, copy every existing row with customer_id NULL, drop the
+  // old table, rename, and recreate its indexes — all inside this migration's
+  // transaction.
+  await db.execute('''
+    CREATE TABLE payments_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      sale_id INTEGER NOT NULL,
+      payment_method TEXT NOT NULL,
+      amount_minor INTEGER NOT NULL,
+      reference TEXT,
+      received_minor INTEGER,
+      change_minor INTEGER,
+      customer_id INTEGER,
+      paid_at TEXT NOT NULL,
+      staff_uuid TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+      FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE SET NULL
+    )
+  ''');
+  await db.execute('''
+    INSERT INTO payments_new (
+      id, uuid, sale_id, payment_method, amount_minor, reference,
+      received_minor, change_minor, paid_at, staff_uuid, created_at
+    )
+    SELECT
+      id, uuid, sale_id, payment_method, amount_minor, reference,
+      received_minor, change_minor, paid_at, staff_uuid, created_at
+    FROM payments
+  ''');
+  await db.execute('DROP TABLE payments');
+  await db.execute('ALTER TABLE payments_new RENAME TO payments');
+  await db.execute('CREATE INDEX idx_payments_sale_id ON payments(sale_id)');
+  await db.execute(
+    'CREATE INDEX idx_payments_payment_method ON payments(payment_method)',
+  );
+  await db.execute('CREATE INDEX idx_payments_paid_at ON payments(paid_at)');
+}
 
 Future<void> _migrateToV2(DatabaseExecutor db) async {
   await db.execute(

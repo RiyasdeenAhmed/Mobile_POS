@@ -197,5 +197,16 @@ void main() {
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Change PIN'), findsNothing);
+
+    // The dashboard runs two chained sqflite reads after the shell mounts:
+    // give each a real window, then flush its continuation with a pump so no
+    // query is still pending when the test tears down.
+    for (var i = 0; i < 2; i++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      });
+      await tester.pump();
+    }
+    expect(find.text('New Sale'), findsWidgets);
   });
 }

@@ -37,6 +37,26 @@ class SaleItem {
 
   DateTime? get createdDateTime => tryParseIso(createdAt);
 
+  SaleItem copyWith({int? id}) {
+    return SaleItem(
+      id: id ?? this.id,
+      uuid: uuid,
+      saleId: saleId,
+      productId: productId,
+      productUuid: productUuid,
+      productName: productName,
+      productSku: productSku,
+      productBarcode: productBarcode,
+      quantity: quantity,
+      unitPriceMinor: unitPriceMinor,
+      unitCostMinor: unitCostMinor,
+      discountMinor: discountMinor,
+      lineTotalMinor: lineTotalMinor,
+      currency: currency,
+      createdAt: createdAt,
+    );
+  }
+
   Map<String, Object?> toMap() {
     return {
       if (id != null) 'id': id,

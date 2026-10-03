@@ -31,8 +31,8 @@ Rules:
 |---|---|---|
 | 1 | `foundation` | All core tables, indexes, and settings defaults |
 | 2 | `auth_and_store_settings` | *(M2)* `staff_users.must_change_pin`; settings for LKR, invoice prefix, receipt footer, tax, negative stock, printer |
-| 3 | `returns_foundation` | *(M10)* `returns`, `return_items` |
-| 4 | `product_and_payment_details` | *(M10)* `products.description`, `payments.customer_id` |
+| 3 | `returns_foundation` | `returns`, `return_items` |
+| 4 | `product_and_payment_details` | `products.description`, `payments.customer_id` (legacy rows NULL) |
 
 ## Money strategy
 
@@ -92,7 +92,7 @@ development seed account to rotate its PIN on first login.
 `id`, `uuid` (UNIQUE), `name`, `parent_id` (FK → `categories`, SET NULL), `sort_order`, `is_active`, `is_archived`, `created_at`, `updated_at`
 
 ### `products`
-`id`, `uuid` (UNIQUE), `sku` (UNIQUE), `barcode` (UNIQUE), `name`, `category_id` (FK → `categories`, SET NULL), `cost_price_minor`, `selling_price_minor`, `currency`, `stock_quantity` REAL, `reorder_level` REAL, `track_stock`, `is_active`, `is_archived`, `description` *(M10, migration v4)*, `created_at`, `updated_at`
+`id`, `uuid` (UNIQUE), `sku` (UNIQUE), `barcode` (UNIQUE), `name`, `category_id` (FK → `categories`, SET NULL), `cost_price_minor`, `selling_price_minor`, `currency`, `stock_quantity` REAL, `reorder_level` REAL, `track_stock`, `is_active`, `is_archived`, `description` *(migration v4)*, `created_at`, `updated_at`
 
 `track_stock = 0` means the product is not inventory-controlled (e.g. services):
 sales do not decrement stock and write no stock movement. `is_archived` is a
@@ -129,7 +129,7 @@ renamed or repriced.
 Indexes: `sale_id`, `product_id`.
 
 ### `payments`
-`id`, `uuid` (UNIQUE), `sale_id` (FK → `sales`, CASCADE), `payment_method`, `amount_minor`, `reference`, `received_minor`, `change_minor`, `paid_at`, `staff_uuid`, `customer_id` *(M10)*, `created_at`
+`id`, `uuid` (UNIQUE), `sale_id` (FK → `sales`, CASCADE), `payment_method`, `amount_minor`, `reference`, `received_minor`, `change_minor`, `paid_at`, `staff_uuid`, `customer_id` *(migration v4, nullable)*, `created_at`
 
 `received_minor`/`change_minor` are populated for cash only. `reference` holds
 an optional card authorisation note. Card rows record an intent to pay; there
@@ -151,17 +151,17 @@ Indexes: `(product_id, created_at)`, `movement_type`, `(reference_type, referenc
 `id`, `uuid` (UNIQUE), `customer_id` (FK → `customers`, RESTRICT), `entry_type`, `amount_minor`, `balance_after_minor`, `sale_uuid`, `sale_id` (FK → `sales`, SET NULL), `note`, `staff_uuid`, `created_at`
 
 `entry_type` is `debt_sale` (positive, increases debt), `repayment` (negative,
-decreases debt), `return_credit` *(M10)*, or `adjustment`. `amount_minor` is
+decreases debt), `return_credit`, or `adjustment`. `amount_minor` is
 **signed**. `balance_after_minor` records the resulting outstanding balance so
 history stays auditable even if a later correction is appended. Entries are
 never deleted or rewritten.
 
 Indexes: `(customer_id, created_at)`, `sale_uuid`, `entry_type`.
 
-### `returns` *(M10)*
+### `returns`
 `id`, `uuid` (UNIQUE), `sale_id` (FK → `sales`, RESTRICT), `sale_uuid`, `customer_id`, `staff_uuid`, `status`, `refund_total_minor`, `refund_method`, `reason`, `created_at`, `updated_at`
 
-### `return_items` *(M10)*
+### `return_items`
 `id`, `uuid` (UNIQUE), `return_id` (FK → `returns`, CASCADE), `sale_item_id` (FK → `sale_items`, RESTRICT), `product_id`, `product_uuid`, `product_name`, `quantity` REAL, `unit_refund_minor`, `line_refund_minor`, `created_at`
 
 ## Referential integrity
