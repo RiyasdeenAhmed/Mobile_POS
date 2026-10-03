@@ -1,0 +1,42 @@
+import 'package:nested/nested.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/database/app_database.dart';
+import '../../core/database/settings_repository.dart';
+import '../../features/categories/data/category_repository.dart';
+import '../../features/checkout/data/checkout_service.dart';
+import '../../features/customers/data/customer_repository.dart';
+import '../../features/pos/domain/cart_controller.dart';
+import '../../features/products/data/product_repository.dart';
+import '../../features/sales/data/sale_repository.dart';
+import '../../features/staff/data/staff_repository.dart';
+
+List<SingleChildWidget> buildAppProviders(AppDatabase database) {
+  return <SingleChildWidget>[
+    Provider<AppDatabase>.value(value: database),
+    ProxyProvider<AppDatabase, SettingsRepository>(
+      update: (_, db, __) => SettingsRepository(db),
+    ),
+    ProxyProvider<AppDatabase, ProductRepository>(
+      update: (_, db, __) => ProductRepository(db),
+    ),
+    ProxyProvider<AppDatabase, CategoryRepository>(
+      update: (_, db, __) => CategoryRepository(db),
+    ),
+    ProxyProvider<AppDatabase, CustomerRepository>(
+      update: (_, db, __) => CustomerRepository(db),
+    ),
+    ProxyProvider<AppDatabase, SaleRepository>(
+      update: (_, db, __) => SaleRepository(db),
+    ),
+    ProxyProvider<AppDatabase, StaffRepository>(
+      update: (_, db, __) => StaffRepository(db),
+    ),
+    ProxyProvider<AppDatabase, CheckoutService>(
+      update: (_, db, __) => CheckoutService(db),
+    ),
+    ChangeNotifierProvider<CartController>(
+      create: (_) => CartController(),
+    ),
+  ];
+}

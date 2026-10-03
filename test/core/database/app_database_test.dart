@@ -1,0 +1,76 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:qubexcore_pos/core/database/app_database.dart';
+import 'package:qubexcore_pos/core/database/settings_repository.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
+  test('schema version is 1 and core tables exist', () async {
+    final db = await AppDatabase.open(path: inMemoryDatabasePath);
+    expect(AppDatabase.schemaVersion, 1);
+
+    final rows = await db.db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    );
+    final names = rows.map((row) => row['name'] as String).toSet();
+    const expected = {
+      'schema_migrations',
+      'app_settings',
+      'staff_users',
+      'products',
+      'categories',
+      'customers',
+      'sales',
+      'sale_items',
+      'payments',
+      'stock_movements',
+      'customer_ledger',
+    };
+    for (final table in expected) {
+      expect(names.contains(table), isTrue, reason: 'missing $table');
+    }
+    await db.close();
+  });
+
+  test('foreign keys are enabled', () async {
+    final db = await AppDatabase.open(path: inMemoryDatabasePath);
+    expect(await db.areForeignKeysEnabled(), isTrue);
+    await db.close();
+  });
+
+  test('settings are seeded and schema migration recorded', () async {
+    final db = await AppDatabase.open(path: inMemoryDatabasePath);
+    final settings = SettingsRepository(db);
+    expect(await settings.getString('store_name'), 'QubeXCore Store');
+    expect(await settings.getString('currency_symbol'), r'$');
+    expect(await settings.getString('currency_code'), 'USD');
+    expect(await settings.getString('invoice_sequence'), '0');
+
+    final migrations = await db.db.query('schema_migrations');
+    final versions = migrations.map((row) => row['version']).toSet();
+    expect(versions.contains(1), isTrue);
+    await db.close();
+  });
+
+  test('data persists across reopen', () async {
+    final tempDir = await Directory.systemTemp.createTemp('qubex_db_test');
+    final path = p.join(tempDir.path, 'qubexcore.db');
+    final first = await AppDatabase.open(path: path);
+    final settings = SettingsRepository(first);
+    await settings.setString('store_name', 'Persisted Store');
+    await first.close();
+
+    final second = await AppDatabase.open(path: path);
+    final reopened = SettingsRepository(second);
+    expect(await reopened.getString('store_name'), 'Persisted Store');
+    await second.close();
+    await tempDir.delete(recursive: true);
+  });
+}
