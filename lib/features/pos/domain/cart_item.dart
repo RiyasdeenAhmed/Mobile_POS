@@ -22,7 +22,7 @@ class CartItem {
     this.quantity = 1,
     this.discountMinor = 0,
     this.trackStock = true,
-    this.currency = 'USD',
+    this.currency = 'LKR',
   });
 
   factory CartItem.fromProduct(

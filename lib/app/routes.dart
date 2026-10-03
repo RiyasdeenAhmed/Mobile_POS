@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/change_pin_screen.dart';
 import '../features/categories/presentation/categories_screen.dart';
 import '../features/checkout/presentation/checkout_screen.dart';
 import '../features/customers/presentation/customer_account_screen.dart';
@@ -16,11 +16,15 @@ import '../features/receipts/presentation/receipt_screen.dart';
 import '../features/sales/presentation/sale_detail_screen.dart';
 import '../features/sales/presentation/sales_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/staff/presentation/staff_management_screen.dart';
+import 'auth_gate.dart';
 import 'main_shell.dart';
 
 class AppRoutes {
   static const String splash = '/splash';
   static const String login = '/login';
+  static const String changePin = '/auth/change-pin';
+  static const String staffManagement = '/staff';
   static const String mainShell = '/main-shell';
   static const String dashboard = '/dashboard';
   static const String newSale = '/pos/new-sale';
@@ -46,14 +50,24 @@ class AppRouter {
       case AppRoutes.login:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const LoginScreen(),
+          builder: (_) => const AuthGate(),
+        );
+      case AppRoutes.changePin:
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const ChangePinScreen(),
+        );
+      case AppRoutes.staffManagement:
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const StaffManagementScreen(),
         );
       case AppRoutes.mainShell:
       case AppRoutes.dashboard:
       case AppRoutes.splash:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const MainShell(),
+          builder: (_) => const AuthGate(child: MainShell()),
         );
       case AppRoutes.newSale:
         return MaterialPageRoute<void>(
@@ -139,7 +153,7 @@ class AppRouter {
       default:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const MainShell(),
+          builder: (_) => const AuthGate(child: MainShell()),
         );
     }
   }
@@ -167,6 +181,12 @@ class AppNavigator {
 
   static Future<T?> toLogin<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.login);
+
+  static Future<T?> toChangePin<T>(BuildContext context) =>
+      pushNamed<T>(context, AppRoutes.changePin);
+
+  static Future<T?> toStaffManagement<T>(BuildContext context) =>
+      pushNamed<T>(context, AppRoutes.staffManagement);
 
   static Future<T?> toMainShell<T>(BuildContext context) =>
       pushNamed<T>(context, AppRoutes.mainShell);

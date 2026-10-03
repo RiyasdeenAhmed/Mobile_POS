@@ -484,4 +484,68 @@ void main() {
     expect(items, hasLength(1));
     expect(items.single.productName, 'Reload');
   });
+
+  test('completeSale records the staff uuid on sale, payment, and movement',
+      () async {
+    final product = await createProduct(name: 'Mocha', price: 800, stock: 5);
+    final outcome = await checkout.completeSale(
+      CheckoutRequest(
+        items: [cartFromProduct(product)],
+        paymentMethod: PaymentMethods.cash,
+        cashReceivedMinor: 1000,
+        staffUuid: 'uuid-admin',
+      ),
+    );
+
+    expect(outcome.isSuccess, isTrue);
+    expect(outcome.dataOrNull!.sale.staffUuid, 'uuid-admin');
+
+    final paymentRows = await db.db.query('payments');
+    expect(paymentRows.single['staff_uuid'], 'uuid-admin');
+
+    final movementRows = await db.db.query(
+      'stock_movements',
+      where: 'movement_type = ?',
+      whereArgs: ['sale'],
+    );
+    expect(movementRows.single['staff_uuid'], 'uuid-admin');
+  });
+
+  test('credit sale records the staff uuid on the ledger entry', () async {
+    final customer = await customers.create(
+      name: 'Ledger Customer',
+      creditLimitMinor: 500000,
+    );
+    final product = await createProduct(name: 'Juice', price: 700, stock: 4);
+    final outcome = await checkout.completeSale(
+      CheckoutRequest(
+        items: [cartFromProduct(product)],
+        paymentMethod: PaymentMethods.credit,
+        customerUuid: customer.dataOrNull!.uuid,
+        staffUuid: 'uuid-cashier',
+      ),
+    );
+
+    expect(outcome.isSuccess, isTrue);
+    final ledger = await db.db.query('customer_ledger');
+    expect(ledger, hasLength(1));
+    expect(ledger.single['staff_uuid'], 'uuid-cashier');
+    expect(ledger.single['entry_type'], 'debt_sale');
+  });
+
+  test('sale currency defaults to LKR', () async {
+    final product = await createProduct(name: 'Tea', price: 300, stock: 5);
+    final outcome = await checkout.completeSale(
+      CheckoutRequest(
+        items: [cartFromProduct(product)],
+        paymentMethod: PaymentMethods.cash,
+        cashReceivedMinor: 300,
+      ),
+    );
+
+    expect(outcome.isSuccess, isTrue);
+    expect(outcome.dataOrNull!.items.single.currency, 'LKR');
+    final stored = await db.db.query('sale_items');
+    expect(stored.single['currency'], 'LKR');
+  });
 }

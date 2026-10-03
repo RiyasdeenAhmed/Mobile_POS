@@ -10,6 +10,7 @@ import '../../customers/data/customer_repository.dart';
 import '../../customers/domain/customer.dart';
 import '../../payments/domain/payment.dart';
 import '../../pos/domain/cart_controller.dart';
+import '../../staff/application/staff_session.dart';
 import '../data/checkout_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -125,6 +126,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ? _cardReferenceController.text
           : null,
       customerUuid: _selectedCustomer?.uuid,
+      staffUuid: context.read<StaffSession>().staffUuid,
     );
     final result = await service.completeSale(request);
     if (!mounted) return;

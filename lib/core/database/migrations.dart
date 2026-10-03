@@ -18,9 +18,69 @@ const MigrationStep migrationV1 = MigrationStep(
   up: _migrateToV1,
 );
 
+const MigrationStep migrationV2 = MigrationStep(
+  version: 2,
+  name: 'auth_and_store_settings',
+  up: _migrateToV2,
+);
+
 const List<MigrationStep> kMigrations = <MigrationStep>[
   migrationV1,
+  migrationV2,
 ];
+
+Future<void> _migrateToV2(DatabaseExecutor db) async {
+  await db.execute(
+    'ALTER TABLE staff_users ADD COLUMN must_change_pin INTEGER NOT NULL DEFAULT 0',
+  );
+
+  final now = DateTime.now().toUtc().toIso8601String();
+
+  await db.update(
+    'app_settings',
+    {'value': 'LKR', 'updated_at': now},
+    where: 'key = ?',
+    whereArgs: ['currency_code'],
+  );
+  await db.update(
+    'app_settings',
+    {'value': 'Rs', 'updated_at': now},
+    where: 'key = ?',
+    whereArgs: ['currency_symbol'],
+  );
+
+  final settings = <Map<String, Object?>>[
+    {'key': 'store_address', 'value': ''},
+    {'key': 'store_phone', 'value': ''},
+    {'key': 'invoice_prefix', 'value': 'INV'},
+    {'key': 'receipt_footer', 'value': 'Thank you for your purchase'},
+    {'key': 'tax_rate_minor', 'value': '0'},
+    {'key': 'allow_negative_stock', 'value': '0'},
+    {'key': 'printer_enabled', 'value': '0'},
+    {'key': 'printer_name', 'value': ''},
+    {'key': 'printer_width', 'value': '32'},
+  ];
+  for (final row in settings) {
+    await db.insert(
+      'app_settings',
+      {'key': row['key'], 'value': row['value'], 'updated_at': now},
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  await db.update(
+    'products',
+    {'currency': 'LKR'},
+    where: 'currency = ?',
+    whereArgs: ['USD'],
+  );
+  await db.update(
+    'sale_items',
+    {'currency': 'LKR'},
+    where: 'currency = ?',
+    whereArgs: ['USD'],
+  );
+}
 
 Future<void> _migrateToV1(DatabaseExecutor db) async {
   await db.execute('''

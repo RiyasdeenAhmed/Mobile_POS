@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
+import '../features/staff/application/staff_session.dart';
 import 'routes.dart';
 
 class BootstrapScreen extends StatefulWidget {
@@ -15,7 +18,13 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.mainShell);
+      final session = context.read<StaffSession>();
+      final destination = !session.isSignedIn
+          ? AppRoutes.login
+          : session.mustChangePin
+              ? AppRoutes.changePin
+              : AppRoutes.mainShell;
+      Navigator.of(context).pushReplacementNamed(destination);
     });
   }
 

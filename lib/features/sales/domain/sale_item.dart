@@ -31,7 +31,7 @@ class SaleItem {
     this.unitCostMinor = 0,
     this.discountMinor = 0,
     required this.lineTotalMinor,
-    this.currency = 'USD',
+    this.currency = 'LKR',
     required this.createdAt,
   });
 
@@ -72,7 +72,7 @@ class SaleItem {
       unitCostMinor: (map['unit_cost_minor'] as num?)?.toInt() ?? 0,
       discountMinor: (map['discount_minor'] as num?)?.toInt() ?? 0,
       lineTotalMinor: (map['line_total_minor'] as num).toInt(),
-      currency: (map['currency'] as String?) ?? 'USD',
+      currency: (map['currency'] as String?) ?? 'LKR',
       createdAt: map['created_at'] as String,
     );
   }

@@ -44,12 +44,34 @@ flutter test test/features/checkout/checkout_service_test.dart -j 1
   `find.descendant(of: find.byType(NavigationBar), matching: find.text('Sales'))`.
 - `DatabaseException` has no `.message`; use `describeDatabaseError(error, fallback)`
   from `core/utils/result.dart`.
+- **Real async never completes under FakeAsync.** Sign-in performs a sqflite FFI
+  read and a PBKDF2 derivation. Neither finishes if the test only calls
+  `tester.pump()`. Put the tap *and* the polling wait inside
+  `tester.runAsync`, then `pump` once to render the result:
+
+  ```dart
+  await tester.runAsync(() async {
+    await tester.tap(finder, warnIfMissed: false);
+    for (var i = 0; i < 300; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      if (until()) return;
+    }
+  });
+  await tester.pump();
+  ```
+
+- Never pass `warnIfMissed: false` while diagnosing. A tap that silently misses
+  looks identical to an async operation that never completes.
+- Use `result.dataOrNull` and `result.failureOrNull?.code`, not `result.data`
+  or `result.code`, when reading an `AppResult`.
 - UUID validation uses `UuidValidation.isValidUUID(fromString: value)` from
   `package:uuid/validation.dart`, not `Uuid.isValid` / `Uuid.tryParse`.
 
 ## Current coverage
 
-Baseline: **42 passing tests** across 9 files.
+Baseline: **99 passing tests** across 12 files. The auth-gate widget tests take
+about 60 seconds on this host because each sign-in performs a real 120000
+iteration PBKDF2 derivation; this is expected, not a hang.
 
 | Suite | Covers |
 |---|---|
@@ -62,6 +84,10 @@ Baseline: **42 passing tests** across 9 files.
 | `test/features/pos/cart_controller_test.dart` | Line totals in minor units, product snapshotting, cart totals, merge, increment/decrement, clear |
 | `test/features/products/product_repository_test.dart` | Product creation, barcode lookup, archive, validation failures |
 | `test/features/settings/settings_repository_test.dart` | Defaults seeded, get/set, fallback |
+| `test/core/security/pin_hasher_test.dart` | Hash format, salt uniqueness, verify, malformed input, known PBKDF2 vector |
+| `test/features/staff/staff_repository_test.dart` | `verifyPin`, credential-disclosure resistance, archived/deactivated, `setPin`, `changePin`, PIN format, update, archive, last-admin guard |
+| `test/features/staff/staff_session_test.dart` | Sign in/out state, role accessors, `mustChangePin`, PIN rotation, detached repository |
+| `test/app/auth_gate_test.dart` | Gate blocks the register while signed out, wrong PIN error, forced PIN change, direct shell access |
 
 ## Required test coverage for Phase 1
 
@@ -97,9 +123,9 @@ Checkout regression cases:
 
 Planned additions:
 
-- [ ] PIN hashing and login verification *(M2)*
-- [ ] Forced PIN change *(M2)*
-- [ ] Sale staff attribution *(M2)*
+- [x] PIN hashing and login verification *(M2)*
+- [x] Forced PIN change *(M2)*
+- [x] Sale staff attribution *(M2)*
 - [ ] Dashboard metrics *(M10)*
 - [ ] Sales history filters *(M10)*
 - [ ] Receipt model and ESC/POS builder *(M9)*

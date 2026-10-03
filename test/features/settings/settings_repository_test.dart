@@ -23,7 +23,7 @@ void main() {
 
   test('defaults are seeded', () async {
     expect(await repository.getString('store_name'), 'QubeXCore Store');
-    expect(await repository.getStringOrDefault('currency_code', 'EUR'), 'USD');
+    expect(await repository.getStringOrDefault('currency_code', 'EUR'), 'LKR');
     await repository.ensureSeededDefaults();
     expect(await repository.getString('store_name'), 'QubeXCore Store');
   });

@@ -30,7 +30,7 @@ class SettingsScreen extends StatelessWidget {
                 leading: const Icon(Icons.attach_money),
                 title: const Text('Currency'),
                 subtitle: Text(
-                  '${settings['currency_code'] ?? 'USD'} (${settings['currency_symbol'] ?? r'$'})',
+                  '${settings['currency_code'] ?? 'LKR'} (${settings['currency_symbol'] ?? r'$'})',
                 ),
               ),
               ListTile(

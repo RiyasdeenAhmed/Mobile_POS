@@ -18,7 +18,7 @@ class ProductRepository {
     int? categoryId,
     int costPriceMinor = 0,
     int sellingPriceMinor = 0,
-    String currency = 'USD',
+    String currency = 'LKR',
     double stockQuantity = 0,
     double reorderLevel = 0,
     bool trackStock = true,

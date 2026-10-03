@@ -21,10 +21,10 @@ Nothing is marked complete without implementation and test evidence.
 | State management | Provider |
 | Routing | Custom `onGenerateRoute` router |
 | Currency | LKR, symbol `Rs`, integer minor units |
-| Schema version | 1 |
-| Tests | 42 passing |
+| Schema version | 2 |
+| Tests | 99 passing |
 | Static analysis | Clean |
-| Git | Initialised in M0 |
+| Git | Initialised in M0, baseline commit `9b6affe` |
 
 ---
 
@@ -40,21 +40,21 @@ Nothing is marked complete without implementation and test evidence.
 
 ## Packages
 
-- [ ] Add `cryptography: ^2.9.0` (PBKDF2-HMAC-SHA256) — M2
+- [x] Add `cryptography: ^2.9.0` (PBKDF2-HMAC-SHA256) — M2
 - [ ] Add `mobile_scanner: ^7.4.2` (barcode camera) — M8
-- [ ] Verify `flutter pub get` and `flutter analyze` after each addition
+- [x] Verify `flutter pub get` and `flutter analyze` after each addition
 
 ---
 
 ## M0 — Git baseline and documentation
 
-- [ ] `git init`
-- [ ] Create `docs/development-progress.md`
-- [ ] Create `docs/architecture.md`
-- [ ] Create `docs/database.md`
-- [ ] Create `docs/business-rules.md`
-- [ ] Create `docs/testing.md`
-- [ ] Baseline commit
+- [x] `git init`
+- [x] Create `docs/development-progress.md`
+- [x] Create `docs/architecture.md`
+- [x] Create `docs/database.md`
+- [x] Create `docs/business-rules.md`
+- [x] Create `docs/testing.md`
+- [x] Baseline commit (`9b6affe`, 197 files)
 
 ## M1 — Project foundation, theme, navigation, SQLite
 
@@ -71,20 +71,28 @@ Nothing is marked complete without implementation and test evidence.
 
 ## M2 — Local staff authentication
 
-- [ ] `PinHasher` (PBKDF2-HMAC-SHA256, random salt, constant-time compare)
-- [ ] Migration v2 `auth_and_store_settings`
-  - [ ] `staff_users.must_change_pin`
-  - [ ] Settings: `currency_code=LKR`, `currency_symbol=Rs`
-  - [ ] Settings: `invoice_prefix`, `receipt_footer`, `tax_rate_minor`, `allow_negative_stock`, printer keys
-- [ ] Development seed: `admin` / `1234` with `must_change_pin = 1`
-- [ ] `StaffRepository.verifyPin`
-- [ ] `StaffSession` provider (uuid, display name, role, login, logout)
-- [ ] Real login screen (remove demo bypass)
-- [ ] Forced PIN change flow when `must_change_pin` is set
-- [ ] Logout action
-- [ ] Pass `staffUuid` into `CheckoutRequest`
-- [ ] Staff management screen (admin only) with archive and PIN reset
-- [ ] Tests: hash/verify, wrong PIN, must-change enforcement, sale staff attribution
+- [x] `PinHasher` (PBKDF2-HMAC-SHA256, 120000 iterations, random 16-byte salt, constant-time compare)
+- [x] Injectable iteration count (`StaffRepository.pinIterations`, seeder and provider seams); production locked at 120000, tests inject 1000 via `test/support/test_pin_iterations.dart`; verification always honours the count stored in the hash
+- [x] Self-describing hash format `v1$pbkdf2-hmac-sha256$iterations$salt$digest`
+- [x] Known-vector test cross-checked against an independent PBKDF2 implementation
+- [x] Malformed hash returns false without throwing, and skips the expensive derivation
+- [x] Migration v2 `auth_and_store_settings`
+  - [x] `staff_users.must_change_pin`
+  - [x] Settings migrated USD to `LKR` / `Rs`
+  - [x] Added `invoice_prefix`, `receipt_footer`, `tax_rate_minor`, `allow_negative_stock`, store address/phone, printer keys
+  - [x] Existing `products` / `sale_items` USD rows migrated to LKR
+- [x] Development seed: `admin` / `1234` with `must_change_pin = 1`, debug builds only
+- [x] `StaffRepository.verifyPin` (identical message for unknown user and wrong PIN)
+- [x] `StaffRepository.setPin` and `changePin` with 4 to 8 digit validation
+- [x] `StaffRepository.update` and `setArchived`, plus `isLastActiveAdmin` guard
+- [x] `StaffSession` provider (sign in, change PIN, sign out, role and uuid accessors)
+- [x] Real login screen (demo bypass removed)
+- [x] `ChangePinScreen` forced flow when `must_change_pin` is set
+- [x] `AuthGate` wraps the shell, so the register is unreachable while signed out
+- [x] Logout from the More screen
+- [x] `staffUuid` recorded on sales, payments, stock movements, and credit ledger entries
+- [x] Staff management screen (admin only) with add, role, PIN reset, and archive
+- [x] Tests: 12 hasher, 25 repository, 12 session, 4 auth-gate, 3 checkout attribution
 
 ## M3 — Categories and product management UI
 

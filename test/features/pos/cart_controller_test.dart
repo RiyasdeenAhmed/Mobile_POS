@@ -73,7 +73,7 @@ void main() {
     expect(item.quantity, 2);
     expect(item.lineTotalMinor, 2500);
     expect(item.trackStock, isTrue);
-    expect(item.currency, 'USD');
+    expect(item.currency, 'LKR');
   });
 
   test('cart totals accumulate subtotal, discount, tax zero, and count', () {

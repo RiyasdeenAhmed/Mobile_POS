@@ -3,15 +3,20 @@ import 'package:provider/provider.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/settings_repository.dart';
+import '../../core/security/pin_hasher.dart';
 import '../../features/categories/data/category_repository.dart';
 import '../../features/checkout/data/checkout_service.dart';
 import '../../features/customers/data/customer_repository.dart';
 import '../../features/pos/domain/cart_controller.dart';
 import '../../features/products/data/product_repository.dart';
 import '../../features/sales/data/sale_repository.dart';
+import '../../features/staff/application/staff_session.dart';
 import '../../features/staff/data/staff_repository.dart';
 
-List<SingleChildWidget> buildAppProviders(AppDatabase database) {
+List<SingleChildWidget> buildAppProviders(
+  AppDatabase database, {
+  int pinIterations = defaultIterations,
+}) {
   return <SingleChildWidget>[
     Provider<AppDatabase>.value(value: database),
     ProxyProvider<AppDatabase, SettingsRepository>(
@@ -30,13 +35,23 @@ List<SingleChildWidget> buildAppProviders(AppDatabase database) {
       update: (_, db, __) => SaleRepository(db),
     ),
     ProxyProvider<AppDatabase, StaffRepository>(
-      update: (_, db, __) => StaffRepository(db),
+      update: (_, db, __) => StaffRepository(db, pinIterations: pinIterations),
     ),
     ProxyProvider<AppDatabase, CheckoutService>(
       update: (_, db, __) => CheckoutService(db),
     ),
     ChangeNotifierProvider<CartController>(
       create: (_) => CartController(),
+    ),
+    ChangeNotifierProxyProvider<StaffRepository, StaffSession>(
+      create: (_) => StaffSession(),
+      update: (_, repository, session) {
+        if (session == null) {
+          return StaffSession()..attach(repository);
+        }
+        session.attach(repository);
+        return session;
+      },
     ),
   ];
 }

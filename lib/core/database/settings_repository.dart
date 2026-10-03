@@ -40,9 +40,13 @@ class SettingsRepository {
   Future<void> ensureSeededDefaults() async {
     const defaults = <String, String>{
       'store_name': 'QubeXCore Store',
-      'currency_symbol': r'$',
-      'currency_code': 'USD',
+      'currency_symbol': 'Rs',
+      'currency_code': 'LKR',
       'invoice_sequence': '0',
+      'invoice_prefix': 'INV',
+      'receipt_footer': 'Thank you for your purchase',
+      'tax_rate_minor': '0',
+      'allow_negative_stock': '0',
     };
     for (final entry in defaults.entries) {
       final existing = await getString(entry.key);
@@ -55,9 +59,15 @@ class SettingsRepository {
   Future<Map<String, String>> loadCoreSettings() async {
     const keys = [
       'store_name',
+      'store_address',
+      'store_phone',
       'currency_symbol',
       'currency_code',
       'invoice_sequence',
+      'invoice_prefix',
+      'receipt_footer',
+      'tax_rate_minor',
+      'allow_negative_stock',
     ];
     final result = <String, String>{};
     for (final key in keys) {

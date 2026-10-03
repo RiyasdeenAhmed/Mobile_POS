@@ -12,9 +12,9 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  test('schema version is 1 and core tables exist', () async {
+  test('schema version is 2 and core tables exist', () async {
     final db = await AppDatabase.open(path: inMemoryDatabasePath);
-    expect(AppDatabase.schemaVersion, 1);
+    expect(AppDatabase.schemaVersion, 2);
 
     final rows = await db.db.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table'",
@@ -49,13 +49,22 @@ void main() {
     final db = await AppDatabase.open(path: inMemoryDatabasePath);
     final settings = SettingsRepository(db);
     expect(await settings.getString('store_name'), 'QubeXCore Store');
-    expect(await settings.getString('currency_symbol'), r'$');
-    expect(await settings.getString('currency_code'), 'USD');
+    expect(await settings.getString('currency_symbol'), 'Rs');
+    expect(await settings.getString('currency_code'), 'LKR');
     expect(await settings.getString('invoice_sequence'), '0');
+    expect(await settings.getString('invoice_prefix'), 'INV');
 
     final migrations = await db.db.query('schema_migrations');
     final versions = migrations.map((row) => row['version']).toSet();
-    expect(versions.contains(1), isTrue);
+    expect(versions, containsAll(<int>[1, 2]));
+    await db.close();
+  });
+
+  test('migration v2 adds must_change_pin to staff_users', () async {
+    final db = await AppDatabase.open(path: inMemoryDatabasePath);
+    final columns = await db.db.rawQuery('PRAGMA table_info(staff_users)');
+    final names = columns.map((row) => row['name'] as String).toSet();
+    expect(names, contains('must_change_pin'));
     await db.close();
   });
 
