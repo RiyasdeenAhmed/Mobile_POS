@@ -76,8 +76,8 @@ Key/value store for local configuration. Managed through
 | `currency_code` | `LKR` | Currency code |
 | `invoice_sequence` | `0` | Monotonic invoice counter |
 | `invoice_prefix` | `INV` | Invoice number prefix *(M2)* |
-| `receipt_footer` | `Thank you!` | Receipt footer *(M2)* |
-| `tax_rate_minor` | `0` | Tax configuration *(M2)* |
+| `receipt_footer` | `Thank you for your purchase` | Receipt footer *(M2)* |
+| `tax_rate_bps` | `0` | Tax rate in basis points (1800 = 18%); renamed from `tax_rate_minor` by `ensureSeededDefaults()` *(M6)* |
 | `allow_negative_stock` | `0` | Whether stock may go below zero *(M2)* |
 | `db_schema_note` | `QubeXCore POS local schema v1` | Informational |
 

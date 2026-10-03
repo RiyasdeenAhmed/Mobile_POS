@@ -143,8 +143,8 @@ Nothing is marked complete without implementation and test evidence.
 - [x] Product snapshot immutability in sale items
 - [x] Idempotent submission via `saleUuid`
 - [x] 15 regression tests for the above
-- [ ] Invoice prefix from settings (after M2 adds the key)
-- [ ] Tax applied from settings (currently hardcoded 0)
+- [x] Invoice prefix from settings (after M2 adds the key)
+- [x] Tax applied from settings via `TaxCalculator` (basis points, half-up rounding, applied after discounts; `ensureSeededDefaults()` renames `tax_rate_minor` → `tax_rate_bps` and runs from `main()`)
 
 ## M7 — Customers and debt ledger
 

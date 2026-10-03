@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../../core/utils/result.dart';
+import '../../../core/utils/tax_calculator.dart';
 import '../../../core/utils/time_utils.dart';
 import '../../customers/domain/customer.dart';
 import '../../payments/domain/payment.dart';
@@ -67,7 +68,6 @@ class CheckoutService {
         (txn) async {
           var subtotalMinor = 0;
           var discountMinor = 0;
-          const taxMinor = 0;
           for (final item in items) {
             if (item.quantity <= 0) {
               throw _CheckoutException(
@@ -84,7 +84,11 @@ class CheckoutService {
             subtotalMinor += item.lineGrossMinor;
             discountMinor += item.discountMinor;
           }
-          final totalMinor = subtotalMinor - discountMinor + taxMinor;
+          final taxableMinor = subtotalMinor - discountMinor;
+          final taxRateBps =
+              int.tryParse(await _readSetting(txn, 'tax_rate_bps') ?? '') ?? 0;
+          final taxMinor = TaxCalculator.taxMinor(taxableMinor, taxRateBps);
+          final totalMinor = taxableMinor + taxMinor;
 
           int amountPaidMinor;
           int changeMinor;
@@ -425,7 +429,21 @@ class CheckoutService {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    return 'INV-${sequence.toString().padLeft(6, '0')}';
+    var prefix = (await _readSetting(txn, 'invoice_prefix'))?.trim() ?? '';
+    if (prefix.isEmpty) prefix = 'INV';
+    return '$prefix-${sequence.toString().padLeft(6, '0')}';
+  }
+
+  Future<String?> _readSetting(DatabaseExecutor txn, String key) async {
+    final rows = await txn.query(
+      'app_settings',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['value']?.toString();
   }
 
   Future<Customer> _loadCustomerForCredit(

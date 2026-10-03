@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'app/app.dart';
 import 'core/database/app_database.dart';
+import 'core/database/settings_repository.dart';
 import 'features/staff/data/development_staff_seeder.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     final database = await AppDatabase.open();
+    await SettingsRepository(database).ensureSeededDefaults();
     await DevelopmentStaffSeeder.seed(database);
     runApp(QubeXCoreApp(database: database));
   } catch (error) {

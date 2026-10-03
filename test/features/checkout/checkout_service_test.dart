@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qubexcore_pos/core/database/app_database.dart';
+import 'package:qubexcore_pos/core/database/settings_repository.dart';
 import 'package:qubexcore_pos/core/utils/id_generator.dart';
 import 'package:qubexcore_pos/features/checkout/data/checkout_service.dart';
 import 'package:qubexcore_pos/features/checkout/domain/checkout_models.dart';
@@ -60,6 +61,65 @@ void main() {
   CartItem cartFromProduct(Product product, {double quantity = 1}) {
     return CartItem.fromProduct(product, quantity: quantity);
   }
+
+  test('completeSale applies configured tax in basis points', () async {
+    await SettingsRepository(db).setString('tax_rate_bps', '1800');
+    final product = await createProduct(name: 'Latte', price: 1000, stock: 5);
+    final outcome = await checkout.completeSale(
+      CheckoutRequest(
+        items: [cartFromProduct(product, quantity: 1)],
+        paymentMethod: PaymentMethods.card,
+      ),
+    );
+
+    expect(outcome.isSuccess, isTrue,
+        reason: outcome.failureOrNull?.toString());
+    final sale = outcome.dataOrNull!.sale;
+    expect(sale.subtotalMinor, 1000);
+    expect(sale.discountMinor, 0);
+    expect(sale.taxMinor, 180);
+    expect(sale.totalMinor, 1180);
+    expect(sale.amountPaidMinor, 1180);
+  });
+
+  test('completeSale applies tax after line discounts', () async {
+    await SettingsRepository(db).setString('tax_rate_bps', '1000');
+    final product = await createProduct(name: 'Mug', price: 500, stock: 5);
+    final outcome = await checkout.completeSale(
+      CheckoutRequest(
+        items: [
+          CartItem.fromProduct(product, quantity: 1).copyWith(
+            discountMinor: 100,
+          ),
+        ],
+        paymentMethod: PaymentMethods.card,
+      ),
+    );
+
+    expect(outcome.isSuccess, isTrue,
+        reason: outcome.failureOrNull?.toString());
+    final sale = outcome.dataOrNull!.sale;
+    expect(sale.subtotalMinor, 500);
+    expect(sale.discountMinor, 100);
+    expect(sale.taxMinor, 40);
+    expect(sale.totalMinor, 440);
+  });
+
+  test('completeSale invoice number uses the configured prefix', () async {
+    await SettingsRepository(db).setString('invoice_prefix', 'POS');
+    final product = await createProduct(name: 'Tea', price: 300, stock: 5);
+    final outcome = await checkout.completeSale(
+      CheckoutRequest(
+        items: [cartFromProduct(product, quantity: 1)],
+        paymentMethod: PaymentMethods.cash,
+        cashReceivedMinor: 300,
+      ),
+    );
+
+    expect(outcome.isSuccess, isTrue,
+        reason: outcome.failureOrNull?.toString());
+    expect(outcome.dataOrNull!.sale.invoiceNumber, 'POS-000001');
+  });
 
   test('completeSale writes sale, items, payment, stock, and movement',
       () async {

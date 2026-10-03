@@ -38,6 +38,21 @@ class SettingsRepository {
   }
 
   Future<void> ensureSeededDefaults() async {
+    // Legacy installs stored tax as `tax_rate_minor` (whole percent).
+    // Convert to `tax_rate_bps` idempotently; never edit a released migration.
+    final legacyTax = await getString('tax_rate_minor');
+    if (legacyTax != null) {
+      final existingBps = await getString('tax_rate_bps');
+      if (existingBps == null) {
+        final percent = int.tryParse(legacyTax) ?? 0;
+        await setString('tax_rate_bps', '${percent * 100}');
+      }
+      await database.db.delete(
+        'app_settings',
+        where: 'key = ?',
+        whereArgs: ['tax_rate_minor'],
+      );
+    }
     const defaults = <String, String>{
       'store_name': 'QubeXCore Store',
       'currency_symbol': 'Rs',
@@ -45,7 +60,7 @@ class SettingsRepository {
       'invoice_sequence': '0',
       'invoice_prefix': 'INV',
       'receipt_footer': 'Thank you for your purchase',
-      'tax_rate_minor': '0',
+      'tax_rate_bps': '0',
       'allow_negative_stock': '0',
     };
     for (final entry in defaults.entries) {
@@ -66,7 +81,7 @@ class SettingsRepository {
       'invoice_sequence',
       'invoice_prefix',
       'receipt_footer',
-      'tax_rate_minor',
+      'tax_rate_bps',
       'allow_negative_stock',
     ];
     final result = <String, String>{};

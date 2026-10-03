@@ -36,4 +36,34 @@ void main() {
       'fallback',
     );
   });
+
+  test('ensureSeededDefaults renames legacy tax_rate_minor to tax_rate_bps',
+      () async {
+    expect(await repository.getString('tax_rate_minor'), '0');
+    await repository.setString('tax_rate_minor', '18');
+
+    await repository.ensureSeededDefaults();
+    expect(await repository.getString('tax_rate_bps'), '1800');
+    expect(await repository.getString('tax_rate_minor'), isNull);
+
+    await repository.ensureSeededDefaults();
+    expect(await repository.getString('tax_rate_bps'), '1800');
+    expect(await repository.getString('tax_rate_minor'), isNull);
+  });
+
+  test('ensureSeededDefaults keeps an existing tax_rate_bps', () async {
+    await repository.setString('tax_rate_bps', '500');
+    await repository.setString('tax_rate_minor', '18');
+
+    await repository.ensureSeededDefaults();
+    expect(await repository.getString('tax_rate_bps'), '500');
+    expect(await repository.getString('tax_rate_minor'), isNull);
+  });
+
+  test('ensureSeededDefaults seeds tax_rate_bps when nothing is configured',
+      () async {
+    await repository.ensureSeededDefaults();
+    expect(await repository.getString('tax_rate_bps'), '0');
+    expect(await repository.getString('tax_rate_minor'), isNull);
+  });
 }
