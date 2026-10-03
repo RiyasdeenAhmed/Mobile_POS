@@ -4,24 +4,28 @@ import 'package:intl/intl.dart';
 import 'app_theme.dart';
 
 abstract final class MoneyFormat {
-  static const String defaultSymbol = r'$';
+  /// Display symbol; overridden at bootstrap from the `currency_symbol`
+  /// setting so changing the store currency updates every amount.
+  static String defaultSymbol = 'Rs';
 
-  static String format(int minor, {String symbol = defaultSymbol}) {
+  static String format(int minor, {String? symbol}) {
+    final resolved = symbol ?? defaultSymbol;
     final isNegative = minor < 0;
     final abs = minor.abs();
     final major = abs ~/ 100;
     final cents = abs % 100;
     final majorText = NumberFormat.decimalPattern().format(major);
     final centsText = cents.toString().padLeft(2, '0');
-    final body = '$symbol$majorText.$centsText';
+    final body = '$resolved$majorText.$centsText';
     return isNegative ? '-$body' : body;
   }
 
-  static int parseMajorToMinor(String input, {String symbol = defaultSymbol}) {
+  static int parseMajorToMinor(String input, {String? symbol}) {
+    final resolved = symbol ?? defaultSymbol;
     var text = input.trim().replaceAll(' ', '');
     if (text.isEmpty) return 0;
-    if (text.startsWith(symbol)) {
-      text = text.substring(symbol.length);
+    if (text.startsWith(resolved)) {
+      text = text.substring(resolved.length);
     }
     text = text.replaceAll(',', '');
     var negative = false;
@@ -58,7 +62,7 @@ abstract final class MoneyFormat {
 
 class MoneyText extends StatelessWidget {
   final int amountMinor;
-  final String symbol;
+  final String? symbol;
   final TextStyle? style;
   final Color? color;
   final bool showPlusForPositive;
@@ -66,7 +70,7 @@ class MoneyText extends StatelessWidget {
   const MoneyText({
     super.key,
     required this.amountMinor,
-    this.symbol = MoneyFormat.defaultSymbol,
+    this.symbol,
     this.style,
     this.color,
     this.showPlusForPositive = false,

@@ -80,7 +80,7 @@ class _CustomerAccountScreenState extends State<CustomerAccountScreen> {
                 autofocus: true,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Amount',
                   prefixText: '${MoneyFormat.defaultSymbol} ',
                 ),

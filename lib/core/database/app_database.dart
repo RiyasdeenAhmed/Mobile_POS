@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'migrations.dart';
 
 class AppDatabase {
-  static const int schemaVersion = 2;
+  static const int schemaVersion = 4;
   static const String defaultDbFileName = 'qubexcore.db';
 
   final Database db;

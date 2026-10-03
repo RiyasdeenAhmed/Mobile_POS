@@ -3,14 +3,22 @@ import 'package:flutter/material.dart';
 import 'app/app.dart';
 import 'core/database/app_database.dart';
 import 'core/database/settings_repository.dart';
+import 'core/theme/money_text.dart';
+import 'features/customers/data/development_customer_seeder.dart';
+import 'features/products/data/development_catalog_seeder.dart';
 import 'features/staff/data/development_staff_seeder.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     final database = await AppDatabase.open();
-    await SettingsRepository(database).ensureSeededDefaults();
+    final settings = SettingsRepository(database);
+    await settings.ensureSeededDefaults();
+    MoneyFormat.defaultSymbol =
+        await settings.getStringOrDefault('currency_symbol', 'Rs');
     await DevelopmentStaffSeeder.seed(database);
+    await DevelopmentCatalogSeeder.seed(database);
+    await DevelopmentCustomerSeeder.seed(database);
     runApp(QubeXCoreApp(database: database));
   } catch (error) {
     runApp(DatabaseErrorApp(message: '$error'));

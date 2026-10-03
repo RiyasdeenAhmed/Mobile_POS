@@ -1,6 +1,6 @@
 # QubeXCore POS — Database
 
-> SQLite schema, migrations, and money strategy. Last updated: 2026-10-03
+> SQLite schema, migrations, and money strategy. Last updated: 2026-10-04
 
 ## Connection
 
@@ -9,7 +9,7 @@
 | Engine | SQLite via `sqflite` (device), `sqflite_common_ffi` (tests) |
 | File | `qubexcore.db` in the platform app-support directory |
 | Foreign keys | Enabled on every connection (`PRAGMA foreign_keys = ON`) |
-| Schema version | `1` (see `AppDatabase.schemaVersion`) |
+| Schema version | `4` (see `AppDatabase.schemaVersion`; `onUpgrade` applies pending migrations up to it) |
 | Migration ledger | `schema_migrations(version, name, applied_at)` |
 
 `getDatabasesPath()` comes from `sqflite`, not `path_provider`.
@@ -53,7 +53,9 @@ Rules:
   converting a fractional `quantity` into a line amount, which is immediately
   rounded: `(unitPriceMinor * quantity).round()`.
 - Display formatting lives in `MoneyFormat.format`; input parsing in
-  `MoneyFormat.parseMajorToMinor`.
+  `MoneyFormat.parseMajorToMinor`. The display symbol defaults to `Rs` and is
+  overridden from `app_settings.currency_symbol` at app bootstrap and after
+  each settings save, so every screen and receipt follows the setting.
 - Quantities (`stock_quantity`, `sale_items.quantity`) are `REAL` because
   weighed goods may be fractional. This is deliberate and does not compromise
   money accuracy.
@@ -72,13 +74,19 @@ Key/value store for local configuration. Managed through
 | Key | Default | Purpose |
 |---|---|---|
 | `store_name` | `QubeXCore Store` | Receipt header |
-| `currency_symbol` | `Rs` | Money display symbol |
+| `store_address` | *(empty)* | Store address line on receipts *(M11)* |
+| `store_phone` | *(empty)* | Store contact on receipts *(M11)* |
+| `currency_symbol` | `Rs` | Money display symbol; injected into `MoneyFormat.defaultSymbol` at bootstrap and after each settings save *(M11)* |
 | `currency_code` | `LKR` | Currency code |
 | `invoice_sequence` | `0` | Monotonic invoice counter |
-| `invoice_prefix` | `INV` | Invoice number prefix *(M2)* |
-| `receipt_footer` | `Thank you for your purchase` | Receipt footer *(M2)* |
-| `tax_rate_bps` | `0` | Tax rate in basis points (1800 = 18%); renamed from `tax_rate_minor` by `ensureSeededDefaults()` *(M6)* |
-| `allow_negative_stock` | `0` | Whether stock may go below zero *(M2)* |
+| `invoice_prefix` | `INV` | Invoice number prefix *(M2, editable in M11)* |
+| `receipt_footer` | `Thank you for your purchase` | Receipt footer *(M2, editable in M11)* |
+| `tax_rate_bps` | `0` | Tax rate in basis points (1800 = 18%); renamed from `tax_rate_minor` by `ensureSeededDefaults()` *(M6, editable as percent in M11)* |
+| `allow_negative_stock` | `0` | Whether stock may go below zero *(M2, editable in M11)* |
+| `printer_enabled` | `0` | Use the configured printer service *(M9, editable in M11)* |
+| `printer_name` | *(empty)* | Label for the paired printer *(M9, editable in M11)* |
+| `printer_width` | `32` | Receipt columns: 32 = 58 mm, 42 = 80 mm *(M9, editable in M11)* |
+| `auto_print_receipt` | `0` | Print automatically after each completed sale *(M9, editable in M11)* |
 | `db_schema_note` | `QubeXCore POS local schema v1` | Informational |
 
 ### `staff_users`

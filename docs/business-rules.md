@@ -1,7 +1,7 @@
 # QubeXCore POS — Business Rules
 
 > Financial, inventory, and customer-account rules enforced by the app.
-> Last updated: 2026-10-03
+> Last updated: 2026-10-04
 
 These rules are enforced in the `data/` layer and covered by tests. The rules
 here are the source of truth; code comments are secondary.
@@ -16,6 +16,10 @@ here are the source of truth; code comments are secondary.
 - Never mix a major-unit value into a minor-unit field.
 - Display formatting and input parsing live in `MoneyFormat`; repositories
   never format strings.
+- The display symbol comes from `app_settings.currency_symbol` (default `Rs`).
+  It is loaded into `MoneyFormat.defaultSymbol` when the app starts and again
+  after every settings save, so prices, cart totals, receipts, and reports all
+  render the same symbol. Formatting still uses integer minor units.
 
 ## 2. Atomic sale completion
 
@@ -195,8 +199,24 @@ Inputs are validated before persistence and rejected with clear messages:
   negative; cash sufficient; customer present for credit
 - Stock adjustment: quantity non-zero and of the correct sign for its movement
   type; note required
+- Settings: store name and invoice prefix non-empty; currency symbol
+  non-empty; tax rate a number between 0 and 100 (percent) stored as integer
+  basis points; printer width one of 32 or 42. Invalid settings are rejected
+  before anything is persisted.
 
-## 15. Offline operation
+## 15. Development seed data
+
+- Debug builds seed demo data once at startup: four categories
+  (Beverages, Groceries, Snacks, Household), ten barcoded products, and two
+  customers with credit limits.
+- Seeding is idempotent: rows that already exist (categories by name,
+  products by barcode, customers by name) are skipped, so restarting the app
+  never duplicates data.
+- Seeding is compiled behind `kDebugMode` and never runs in release builds.
+- The development staff account (`admin` / `1234`) is seeded the same way and
+  must change its PIN on first login.
+
+## 16. Offline operation
 
 - No network calls are made at any point in Phase 1.
 - All data is local. The app must remain fully functional with no internet

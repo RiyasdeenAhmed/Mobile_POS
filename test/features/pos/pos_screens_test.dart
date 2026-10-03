@@ -286,7 +286,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Acme Cafe'), findsOneWidget);
     expect(
-      find.textContaining(r'Limit $'),
+      find.textContaining(r'Limit Rs'),
       findsOneWidget,
     );
   });

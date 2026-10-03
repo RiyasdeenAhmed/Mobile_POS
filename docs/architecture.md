@@ -1,6 +1,6 @@
 # QubeXCore POS — Architecture
 
-> Phase 1: Offline Mobile POS MVP. Last updated: 2026-10-03
+> Phase 1: Offline Mobile POS MVP. Last updated: 2026-10-04
 
 ## Purpose
 
@@ -64,22 +64,20 @@ lib/
 │   ├── utils/                      UUID, result type, time helpers
 │   └── widgets/                    Shared widgets
 └── features/
-    ├── auth/           Staff login
-    ├── dashboard/      Metrics + quick actions
+    ├── auth/           Staff login and auth gate
+    ├── dashboard/      Real metrics + recent transactions
     ├── categories/     Product categories
-    ├── products/       Product CRUD
+    ├── products/       Product CRUD (+ debug catalog seeder)
     ├── inventory/      Stock levels and movements
-    ├── pos/            New Sale + cart
+    ├── pos/            New Sale, cart, camera scan-to-cart
     ├── checkout/       Payment capture + atomic sale completion
-    ├── customers/      Customer accounts + debt ledger
-    ├── sales/          Sales history and detail
+    ├── customers/      Customer accounts + debt ledger (+ debug seeder)
+    ├── sales/          Sales history, filters, detail, returns service
     ├── payments/       Payment model and method constants
-    ├── barcode/        Camera scanning (M8)
-    ├── receipts/       Receipt model and preview
-    ├── returns/        Returns foundation (M10)
-    ├── printers/       ESC/POS printer abstraction (M9)
-    ├── settings/       Local store settings
-    └── staff/          Staff accounts and roles
+    ├── barcode/        BarcodeScanner interface, mobile + fake impls
+    ├── receipts/       Receipt model, ESC/POS builder, printer service
+    ├── settings/       Editable store/sales/receipt settings
+    └── staff/          Staff accounts, roles, development seeder
 ```
 
 ## State management
@@ -89,8 +87,18 @@ repository injection. No Riverpod, Bloc, or Redux.
 
 - `CartController` — in-memory cart for the active sale.
 - `StaffSession` — currently authenticated staff member (M2).
-- Repositories are stateless wrappers around `AppDatabase`, rebuilt by
-  `ProxyProvider` when the database instance changes.
+- `BarcodeScanner` (M8) — `ValueListenable<bool>` interface implemented by
+  `MobileBarcodeScanner` (camera) and `FakeBarcodeScanner` (tests); the scan
+  screen and the new-sale screen both listen through the interface.
+- `PrinterService` (M9) — receipt print transport; ships with `MockPrinter`,
+  swap in an ESC/POS device implementation without touching the UI.
+- Repositories and services (`DashboardRepository`, `ReturnService`,
+  `ReceiptPrintService`, `SettingsRepository`, ...) are stateless wrappers
+  around `AppDatabase`, injected by `Provider` and rebuilt by `ProxyProvider`
+  when the database instance changes.
+- The money display symbol is a process-wide setting:
+  `MoneyFormat.defaultSymbol` is set from `currency_symbol` in `main()` and
+  again after each settings save.
 
 ## Navigation
 
@@ -98,7 +106,7 @@ A custom `onGenerateRoute` router (`AppRoutes`, `AppNavigator`) over Flutter's
 `Navigator`. Route arguments are passed via `RouteSettings.arguments`.
 
 ```
-/login  /dashboard  /pos/new-sale  /pos/cart  /checkout  /receipt
+/login  /dashboard  /pos/new-sale  /pos/cart  /pos/scan  /checkout  /receipt
 /sales  /sales/detail  /products  /products/form  /categories
 /customers  /customers/account  /customers/form  /inventory  /more  /settings
 ```
@@ -141,6 +149,12 @@ transaction:
 
 Any failure throws inside the transaction, and sqflite rolls back the whole
 operation.
+
+The second atomic boundary is return creation
+(`features/sales/data/return_service.dart`): validating returnable
+quantities, inserting `returns`/`return_items`, restoring stock via
+`sale_return` movements, and appending a `return_credit` ledger entry for
+credit sales all commit or roll back together.
 
 ## Testing strategy
 

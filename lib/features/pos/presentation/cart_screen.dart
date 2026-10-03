@@ -329,10 +329,18 @@ class _CartLine extends StatelessWidget {
                 label: const Text('Discount'),
               ),
               const Spacer(),
-              MoneyText(
-                amountMinor: item.lineTotalMinor,
-                style: theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.bold),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: MoneyText(
+                      amountMinor: item.lineTotalMinor,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,6 +1,6 @@
 # QubeXCore POS — Development Progress
 
-> Phase 1: Offline Mobile POS MVP. Last updated: 2026-10-03
+> Phase 1: Offline Mobile POS MVP. Last updated: 2026-10-04
 
 ## Legend
 
@@ -21,8 +21,8 @@ Nothing is marked complete without implementation and test evidence.
 | State management | Provider |
 | Routing | Custom `onGenerateRoute` router |
 | Currency | LKR, symbol `Rs`, integer minor units |
-| Schema version | 2 |
-| Tests | 99 passing |
+| Schema version | 4 |
+| Tests | 201 passing |
 | Static analysis | Clean |
 | Git | Initialised in M0, baseline commit `9b6affe` |
 
@@ -199,15 +199,17 @@ Nothing is marked complete without implementation and test evidence.
 
 ## M11 — Settings, seed data, cleanup, documentation
 
-- [ ] Editable settings screen (shop name, address, phone, currency, invoice prefix, tax, negative stock, receipt footer, printer)
-- [ ] LKR symbol wired into money display from settings
-- [ ] Update money tests for the `Rs` symbol
-- [ ] Development seed data (Beverages, Groceries, Snacks, Household; sample products with barcodes; sample customers) behind a dev-only guard
-- [ ] Fill in `docs/hardware.md` (printer and scanner device matrix)
-- [ ] Finalise `docs/architecture.md`, `docs/database.md`, `docs/business-rules.md`, `docs/testing.md`
-- [ ] Update `README.md` (requirements, setup, run, test, development login, database behaviour)
-- [ ] `flutter analyze` clean
-- [ ] `flutter test` all passing
+- [x] Editable settings screen (shop name, address, phone, currency, invoice prefix, tax, negative stock, receipt footer, printer)
+- [x] LKR symbol wired into money display from settings (`MoneyFormat.defaultSymbol` set at bootstrap and after each save)
+- [x] Update money tests for the `Rs` symbol
+- [x] Development seed data (Beverages, Groceries, Snacks, Household; sample products with barcodes; sample customers) behind a dev-only guard
+- [x] Fix `AppDatabase.schemaVersion` to 4 so pre-v10 installs apply migrations v3/v4; regression test opens a real v1 database and asserts `{1,2,3,4}`
+- [x] Cart line total width-safe (`Flexible` + `FittedBox`) after the `Rs` symbol widened it
+- [x] Fill in `docs/hardware.md` (printer and scanner device matrix)
+- [x] Finalise `docs/architecture.md`, `docs/database.md`, `docs/business-rules.md`, `docs/testing.md`
+- [x] Update `README.md` (requirements, setup, run, test, development login, database behaviour)
+- [x] `flutter analyze` clean
+- [x] `flutter test -j 1` all passing (201 tests, 31 files)
 
 ---
 
@@ -248,7 +250,6 @@ Every milestone must pass before proceeding:
   tradeoff, mitigated by forcing a PIN change on first login.
 - **No backups or sync** — Phase 1 is local-only by design.
 - **No returns UI yet** — returns ship as schema and service only.
-- **Currency symbol not wired to settings** — `app_settings` seeds
-  `currency_symbol = 'Rs'`, but the UI renders `$` via
-  `MoneyFormat.defaultSymbol`; threading the setting through formatting is
-  deferred to the settings/UI pass.
+- **Printer transport is a mock** — `MockPrinter` captures jobs; a real
+  ESC/POS Bluetooth/USB transport still needs a device implementation
+  (see `docs/hardware.md`).
