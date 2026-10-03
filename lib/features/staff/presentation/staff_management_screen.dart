@@ -75,7 +75,7 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
 
   Future<void> _promptResetPin(StaffUser user) async {
     final controller = TextEditingController();
-    final pin = await showDialog<String>(
+    final pin = await showAdaptiveDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Reset PIN for ${user.displayName}'),
@@ -208,7 +208,7 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
     final pinController = TextEditingController();
     var role = 'cashier';
 
-    final shouldSave = await showDialog<bool>(
+    final shouldSave = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(

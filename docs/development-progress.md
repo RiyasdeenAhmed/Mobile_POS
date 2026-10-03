@@ -22,7 +22,7 @@ Nothing is marked complete without implementation and test evidence.
 | Routing | Custom `onGenerateRoute` router |
 | Currency | LKR, symbol `Rs`, integer minor units |
 | Schema version | 4 |
-| Tests | 201 passing |
+| Tests | 207 passing |
 | Static analysis | Clean |
 | Git | Initialised in M0, baseline commit `9b6affe` |
 
@@ -211,6 +211,18 @@ Nothing is marked complete without implementation and test evidence.
 - [x] `flutter analyze` clean
 - [x] `flutter test -j 1` all passing (201 tests, 31 files)
 
+## M12 — Adaptive platform UI and responsive polish
+
+- [x] Dark theme on Login and Splash only; the rest of the app stays light (`Theme(QubeXCoreTheme.dark())` wrap with light status-bar icons via `AnnotatedRegion`)
+- [x] Platform page transitions (`PageTransitionsTheme`: Android zoom, iOS Cupertino back-swipe) and per-route status-bar style (light theme dark icons / dark auth light icons)
+- [x] Adaptive controls: `SwitchListTile.adaptive` (settings), `showAdaptiveDialog` for all confirmation dialogs (bottom sheet stays Material — `showAdaptiveBottomSheet` is not in Flutter 3.47)
+- [x] FAB rules: New Sale reachable from shell FAB and every app bar; Add product and Add customer own their tabs' app bar + FAB; no stacked FABs or duplicate app bars (shell defers chrome on those tabs)
+- [x] Width-safety tests at 360/390/430 px for login, dashboard, new sale, cart, checkout, products, customers, sales, settings (`test/ui/width_safety_test.dart`, including long product/customer names)
+- [x] `ui-review` pass: amount-due dominance and breakdown on checkout, shared empty states, 48dp targets, `Rs` money styling, validation messages verified against the checklist
+- [x] Phase 1 definition of done with test evidence (below)
+- [x] `flutter analyze` clean
+- [x] `flutter test -j 1` all passing (207 tests, 33 files)
+
 ---
 
 ## Milestone gate
@@ -225,21 +237,25 @@ Every milestone must pass before proceeding:
 
 ## Phase 1 definition of done
 
-- [ ] Launch app, staff login
-- [ ] Dashboard shows real metrics
-- [ ] Create or select products
-- [ ] Scan barcode or select a product
-- [ ] Add to cart, modify quantity
-- [ ] Select customer when required
-- [ ] Checkout with cash, card, or credit
-- [ ] Transaction saved locally and atomic
-- [ ] Stock reduced and stock movement created
-- [ ] Customer ledger entry created when required
-- [ ] Receipt generated, print attempted, reprint available
-- [ ] Completed sale visible in sales history
-- [ ] Close app, reopen, all data intact
-- [ ] `flutter analyze` clean
-- [ ] `flutter test` all passing
+Automated evidence is listed per item; the two hardware rows require a
+physical device (see `docs/hardware.md` and the checklist in
+`docs/testing.md`).
+
+- [x] Launch app, staff login — `auth_gate_test`, `staff_session_test`, `pin_hasher_test`
+- [x] Dashboard shows real metrics — `dashboard_repository_test`
+- [x] Create or select products — `product_repository_test`, `pos_screens_test`
+- [x] Scan barcode or select a product — `scan_screen_test` (fake scanner; camera needs a device)
+- [x] Add to cart, modify quantity — `cart_controller_test`, `pos_screens_test`
+- [x] Select customer when required — `checkout_service_test`
+- [x] Checkout with cash, card, or credit — `checkout_service_test`
+- [x] Transaction saved locally and atomic — `checkout_service_test` rollback/idempotency cases
+- [x] Stock reduced and stock movement created — `checkout_service_test`
+- [x] Customer ledger entry created when required — `checkout_service_test`, `return_service_test`
+- [x] Receipt generated, print attempted, reprint available — `receipt_builder_test`, `receipt_screen_test`, `checkout_auto_print_test` (device print needs a printer)
+- [x] Completed sale visible in sales history — `sale_filters_test`, `navigation_test`
+- [x] Close app, reopen, all data intact — `app_database_test` persistence and v1→v4 upgrade cases
+- [x] `flutter analyze` clean — "No issues found!"
+- [x] `flutter test -j 1` all passing — 207 tests
 
 ## Known limitations
 

@@ -112,7 +112,15 @@ A custom `onGenerateRoute` router (`AppRoutes`, `AppNavigator`) over Flutter's
 ```
 
 Bottom navigation: Dashboard, Sales, Products, Customers, More. A persistent
-"New Sale" action is available from the shell app bar and FAB.
+"New Sale" action is available from the shell app bar and FAB; the Products
+and Customers tabs own their own app bar and FAB (Add product / Add customer)
+and the shell defers its chrome to avoid stacked actions.
+
+Theme: the app renders light everywhere except Login and Splash, which wrap
+themselves in `QubeXCoreTheme.dark()` with light status-bar icons. Page
+transitions follow the platform (`PageTransitionsTheme`: Android zoom with
+predictive back, iOS Cupertino with interactive back-swipe), and confirmation
+dialogs use `showAdaptiveDialog`.
 
 ## Error handling
 

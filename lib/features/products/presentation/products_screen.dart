@@ -117,7 +117,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Future<void> _archive(Product product) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Archive ${product.name}?'),
@@ -161,6 +161,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
       appBar: AppBar(
         title: const Text('Products'),
         actions: [
+          IconButton(
+            tooltip: 'New Sale',
+            icon: const Icon(Icons.point_of_sale),
+            onPressed: () => AppNavigator.toNewSale(context),
+          ),
           IconButton(
             tooltip: 'Categories',
             icon: const Icon(Icons.category_outlined),

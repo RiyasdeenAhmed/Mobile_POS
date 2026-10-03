@@ -35,19 +35,26 @@ class _MainShellState extends State<MainShell> {
       _ => const MoreScreen(),
     };
 
+    // Tabs that render their own chrome (app bar and FAB) stay in charge of
+    // their primary action: Add product on Products, Add customer on
+    // Customers. The shell keeps New Sale reachable from every other tab.
+    final screenOwnsChrome = _index == 2 || _index == 3;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_index]),
-        actions: [
-          IconButton(
-            tooltip: 'New Sale',
-            icon: const Icon(Icons.point_of_sale),
-            onPressed: () => AppNavigator.toNewSale(context),
-          ),
-        ],
-      ),
+      appBar: screenOwnsChrome
+          ? null
+          : AppBar(
+              title: Text(_titles[_index]),
+              actions: [
+                IconButton(
+                  tooltip: 'New Sale',
+                  icon: const Icon(Icons.point_of_sale),
+                  onPressed: () => AppNavigator.toNewSale(context),
+                ),
+              ],
+            ),
       body: body,
-      floatingActionButton: _index == 4
+      floatingActionButton: (screenOwnsChrome || _index == 4)
           ? null
           : FloatingActionButton.extended(
               onPressed: () => AppNavigator.toNewSale(context),

@@ -9,7 +9,7 @@ class MoreScreen extends StatelessWidget {
 
   void _confirmSignOut(BuildContext context) {
     final session = context.read<StaffSession>();
-    showDialog<void>(
+    showAdaptiveDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out'),

@@ -55,7 +55,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     String? parentUuid = existing?.parentId?.toString();
 
     final categories = _categories ?? const <Category>[];
-    final shouldSave = await showDialog<bool>(
+    final shouldSave = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) {
         String? nameError;
@@ -148,7 +148,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Future<void> _archive(Category category) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Archive ${category.name}?'),

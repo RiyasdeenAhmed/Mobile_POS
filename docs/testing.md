@@ -98,7 +98,7 @@ flutter test test/features/checkout/checkout_service_test.dart -j 1
 
 ## Current coverage
 
-Baseline: **201 passing tests** across 31 files (see the table below). The
+Baseline: **207 passing tests** across 33 files (see the table below). The
 auth-gate widget tests take about 60 seconds on this host because each
 sign-in performs a real 120000 iteration PBKDF2 derivation; this is expected,
 not a hang.
@@ -129,6 +129,7 @@ not a hang.
 | `test/features/dashboard/dashboard_repository_test.dart` | Today's sales, transaction count, outstanding credit, low-stock metrics |
 | `test/features/sales/return_service_test.dart` | Atomic return, stock restore, quantity guard, rollback, credit `return_credit` ledger |
 | `test/features/sales/sale_filters_test.dart` | Date-range, payment-method, customer filters |
+| `test/ui/width_safety_test.dart` | No overflow on login, shell tabs, new sale, cart, checkout, settings at 360/390/430 px with long names |
 | *(remaining suites)* | Categories CRUD, customers UI/ledger/repayments, inventory adjustments, stock guards, sales UI, staff UI, settings repository |
 
 ## Required test coverage for Phase 1
@@ -176,6 +177,7 @@ Planned additions:
 - [x] Settings validation and persistence *(M11)*
 - [x] Debug seed data idempotency *(M11)*
 - [x] Existing v1 install upgrades to schema v4 *(M11)*
+- [x] Width safety at 360/390/430 px for all primary screens *(M12)*
 
 ## Hardware-dependent checks
 

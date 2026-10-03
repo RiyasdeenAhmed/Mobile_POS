@@ -34,7 +34,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Future<void> _archive(Customer customer) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Archive ${customer.name}?'),
@@ -73,65 +73,84 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
+  Future<void> _addCustomer() async {
+    final added = await AppNavigator.toCustomerForm(context);
+    if (added == true) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Customer>>(
-      future: _future,
-      builder: (context, snapshot) {
-        final customers = snapshot.data ?? const <Customer>[];
-        if (customers.isEmpty) {
-          return EmptyState(
-            icon: Icons.people_outline,
-            title: 'No customers yet',
-            message: 'Add customers to track credit and account balances.',
-            action: ElevatedButton.icon(
-              onPressed: () async {
-                final added = await AppNavigator.toCustomerForm(context);
-                if (added == true) _reload();
-              },
-              icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Add customer'),
-            ),
-          );
-        }
-        return ListView.separated(
-          itemCount: customers.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final customer = customers[index];
-            return ListTile(
-              leading: CircleAvatar(
-                child: Text(
-                  customer.name.isEmpty ? '?' : customer.name[0].toUpperCase(),
-                ),
-              ),
-              title: Text(customer.name),
-              subtitle: Text(customer.phone ?? 'No phone'),
-              trailing: PopupMenuButton<String>(
-                onSelected: (value) async {
-                  if (value == 'edit') {
-                    final updated = await AppNavigator.toCustomerForm(
-                      context,
-                      customerUuid: customer.uuid,
-                    );
-                    if (updated == true) _reload();
-                  } else if (value == 'archive') {
-                    await _archive(customer);
-                  }
-                },
-                itemBuilder: (menuContext) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  PopupMenuItem(value: 'archive', child: Text('Archive')),
-                ],
-              ),
-              onTap: () => AppNavigator.toCustomerAccount(
-                context,
-                customerUuid: customer.uuid,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Customers'),
+        actions: [
+          IconButton(
+            tooltip: 'New Sale',
+            icon: const Icon(Icons.point_of_sale),
+            onPressed: () => AppNavigator.toNewSale(context),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addCustomer,
+        icon: const Icon(Icons.person_add_alt_1),
+        label: const Text('Add customer'),
+      ),
+      body: FutureBuilder<List<Customer>>(
+        future: _future,
+        builder: (context, snapshot) {
+          final customers = snapshot.data ?? const <Customer>[];
+          if (customers.isEmpty) {
+            return EmptyState(
+              icon: Icons.people_outline,
+              title: 'No customers yet',
+              message: 'Add customers to track credit and account balances.',
+              action: ElevatedButton.icon(
+                onPressed: _addCustomer,
+                icon: const Icon(Icons.person_add_alt_1),
+                label: const Text('Add customer'),
               ),
             );
-          },
-        );
-      },
+          }
+          return ListView.separated(
+            itemCount: customers.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final customer = customers[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  child: Text(customer.name.isEmpty
+                      ? '?'
+                      : customer.name[0].toUpperCase()),
+                ),
+                title: Text(customer.name),
+                subtitle: Text(customer.phone ?? 'No phone'),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      final updated = await AppNavigator.toCustomerForm(
+                        context,
+                        customerUuid: customer.uuid,
+                      );
+                      if (updated == true) _reload();
+                    } else if (value == 'archive') {
+                      await _archive(customer);
+                    }
+                  },
+                  itemBuilder: (menuContext) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'archive', child: Text('Archive')),
+                  ],
+                ),
+                onTap: () => AppNavigator.toCustomerAccount(
+                  context,
+                  customerUuid: customer.uuid,
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

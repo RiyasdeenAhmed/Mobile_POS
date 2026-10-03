@@ -53,7 +53,7 @@ class _CartScreenState extends State<CartScreen> {
               : '${item.discountMinor ~/ 100}.${item.discountMinor % 100}'),
     );
     int? saved;
-    final ok = await showDialog<bool>(
+    final ok = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Discount — ${item.productName}'),

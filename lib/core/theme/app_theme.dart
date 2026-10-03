@@ -1,9 +1,22 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
 
 abstract final class QubeXCoreTheme {
+  /// Platform-correct page transitions: Android zoom (predictive-back
+  /// friendly), iOS Cupertino (interactive back-swipe).
+  static const PageTransitionsTheme _pageTransitions = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: ZoomPageTransitionsBuilder(),
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+      TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+    },
+  );
+
   static const ColorScheme _colorScheme = ColorScheme(
     brightness: Brightness.light,
     primary: QubeXCoreColors.primaryBlue,
@@ -50,6 +63,7 @@ abstract final class QubeXCoreTheme {
     );
 
     return base.copyWith(
+      pageTransitionsTheme: _pageTransitions,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.white,
         foregroundColor: QubeXCoreColors.qubexBlack,

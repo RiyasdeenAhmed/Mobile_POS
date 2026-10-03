@@ -234,7 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     validator: _taxValidator,
                   ),
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Allow negative stock'),
                     subtitle: const Text(
@@ -260,7 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Printer enabled'),
                     subtitle: const Text(
@@ -271,7 +271,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       setState(() => _printerEnabled = value);
                     },
                   ),
-                  SwitchListTile(
+                  SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Auto-print receipts'),
                     subtitle: const Text(

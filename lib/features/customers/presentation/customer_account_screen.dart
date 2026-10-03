@@ -62,7 +62,7 @@ class _CustomerAccountScreenState extends State<CustomerAccountScreen> {
   Future<void> _recordRepayment(Customer customer) async {
     final amountController = TextEditingController();
     String method = 'Cash';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
