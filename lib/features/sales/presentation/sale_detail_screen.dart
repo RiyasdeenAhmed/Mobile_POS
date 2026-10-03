@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/money_text.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../receipts/data/receipt_print_service.dart';
 import '../../sales/data/sale_repository.dart';
 import '../../sales/domain/sale.dart';
 import '../../sales/domain/sale_item.dart';
+import '../../staff/application/staff_session.dart';
 
 class SaleDetailScreen extends StatefulWidget {
   final String? saleUuid;
@@ -64,11 +66,42 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     });
   }
 
+  Future<void> _print() async {
+    final sale = _sale;
+    if (sale == null) return;
+    try {
+      await context.read<ReceiptPrintService>().printSale(
+            sale: sale,
+            items: _items,
+            cashierName: context.read<StaffSession>().displayName,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Receipt sent to printer')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printing failed')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Sale detail')),
+      appBar: AppBar(
+        title: const Text('Sale detail'),
+        actions: [
+          if (_sale != null)
+            IconButton(
+              tooltip: 'Print',
+              onPressed: _print,
+              icon: const Icon(Icons.print_outlined),
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

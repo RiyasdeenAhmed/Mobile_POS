@@ -62,6 +62,7 @@ class SettingsRepository {
       'receipt_footer': 'Thank you for your purchase',
       'tax_rate_bps': '0',
       'allow_negative_stock': '0',
+      'auto_print_receipt': '0',
     };
     for (final entry in defaults.entries) {
       final existing = await getString(entry.key);
@@ -83,6 +84,10 @@ class SettingsRepository {
       'receipt_footer',
       'tax_rate_bps',
       'allow_negative_stock',
+      'printer_enabled',
+      'printer_name',
+      'printer_width',
+      'auto_print_receipt',
     ];
     final result = <String, String>{};
     for (final key in keys) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +12,7 @@ import '../../customers/data/customer_repository.dart';
 import '../../customers/domain/customer.dart';
 import '../../payments/domain/payment.dart';
 import '../../pos/domain/cart_controller.dart';
+import '../../receipts/data/receipt_print_service.dart';
 import '../../staff/application/staff_session.dart';
 import '../data/checkout_service.dart';
 
@@ -145,23 +148,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     result.when(
       success: (outcome) {
         cart.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Sale ${outcome.sale.invoiceNumber} completed',
-            ),
-          ),
-        );
-        AppNavigator.toReceipt(
-          context,
-          saleUuid: outcome.sale.uuid,
-        );
+        unawaited(_finishSale(outcome));
       },
       failure: (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(failure.message)),
         );
       },
+    );
+  }
+
+  /// Post-commit step: optional auto-print and receipt navigation. Printing
+  /// failure never rolls back the completed sale.
+  Future<void> _finishSale(CheckoutOutcome outcome) async {
+    final printService = context.read<ReceiptPrintService>();
+    final cashierName = context.read<StaffSession>().displayName;
+    var printFailed = false;
+    try {
+      if (await printService.autoPrintEnabled()) {
+        await printService.printSale(
+          sale: outcome.sale,
+          items: outcome.items,
+          cashierName: cashierName,
+        );
+      }
+    } catch (_) {
+      printFailed = true;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          printFailed
+              ? 'Sale completed — printing failed'
+              : 'Sale ${outcome.sale.invoiceNumber} completed',
+        ),
+      ),
+    );
+    await AppNavigator.toReceipt(
+      context,
+      saleUuid: outcome.sale.uuid,
     );
   }
 

@@ -7,6 +7,9 @@ import '../../../core/widgets/empty_state.dart';
 import '../../sales/data/sale_repository.dart';
 import '../../sales/domain/sale.dart';
 import '../../sales/domain/sale_item.dart';
+import '../../staff/application/staff_session.dart';
+import '../data/receipt_print_service.dart';
+import '../domain/receipt.dart';
 
 class ReceiptScreen extends StatefulWidget {
   final String? saleUuid;
@@ -20,6 +23,7 @@ class ReceiptScreen extends StatefulWidget {
 class _ReceiptScreenState extends State<ReceiptScreen> {
   Sale? _sale;
   List<SaleItem> _items = <SaleItem>[];
+  Receipt? _receipt;
   bool _loading = true;
 
   @override
@@ -48,18 +52,57 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     }
     final items = await repository.listItems(sale.id!);
     if (!mounted) return;
+    final receipt = await context.read<ReceiptPrintService>().buildReceipt(
+          sale: sale,
+          items: items,
+          cashierName: context.read<StaffSession>().displayName,
+        );
+    if (!mounted) return;
     setState(() {
       _sale = sale;
       _items = items;
+      _receipt = receipt;
       _loading = false;
     });
+  }
+
+  Future<void> _print() async {
+    final sale = _sale;
+    if (sale == null) return;
+    try {
+      await context.read<ReceiptPrintService>().printSale(
+            sale: sale,
+            items: _items,
+            cashierName: context.read<StaffSession>().displayName,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Receipt sent to printer')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printing failed')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final receipt = _receipt;
     return Scaffold(
-      appBar: AppBar(title: const Text('Receipt')),
+      appBar: AppBar(
+        title: const Text('Receipt'),
+        actions: [
+          if (receipt != null)
+            IconButton(
+              tooltip: 'Print',
+              onPressed: _print,
+              icon: const Icon(Icons.print_outlined),
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -70,10 +113,32 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        Text('QubeXCore', style: theme.textTheme.titleLarge),
+                        Text(
+                          receipt?.storeName ?? 'QubeXCore',
+                          style: theme.textTheme.titleLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        if (receipt != null &&
+                            receipt.storeAddress.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            receipt.storeAddress.trim(),
+                            style: theme.textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        if (receipt != null &&
+                            receipt.storePhone.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            receipt.storePhone.trim(),
+                            style: theme.textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Text(
-                          _sale?.invoiceNumber ?? 'Receipt preview',
+                          receipt?.invoiceNumber ?? 'Receipt preview',
                           style: theme.textTheme.bodySmall,
                         ),
                         if (_sale != null) ...[
@@ -83,27 +148,44 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                             style: theme.textTheme.bodySmall,
                           ),
                         ],
+                        if (receipt?.cashierName?.trim().isNotEmpty ==
+                            true) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Cashier: ${receipt!.cashierName!.trim()}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                        if (receipt?.customerName?.trim().isNotEmpty ==
+                            true) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Customer: ${receipt!.customerName!.trim()}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         const Divider(),
-                        if (_sale == null)
+                        if (receipt == null)
                           const EmptyState(
                             icon: Icons.receipt_long_outlined,
                             title: 'No sale data',
                             message: 'Complete a sale to see a receipt.',
                           )
                         else ...[
-                          ..._items.map(
-                            (item) => Padding(
+                          ...receipt.lines.map(
+                            (line) => Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${item.quantity} × ${item.productName}',
+                                      '${line.quantityText} × '
+                                      '${line.productName}',
                                     ),
                                   ),
                                   MoneyText(
-                                    amountMinor: item.lineTotalMinor,
+                                    amountMinor: line.lineTotalMinor,
                                     style: theme.textTheme.bodySmall,
                                   ),
                                 ],
@@ -112,35 +194,64 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           ),
                           const Divider(),
                           _ReceiptRow(
+                            label: 'Subtotal',
+                            amountMinor: receipt.subtotalMinor,
+                          ),
+                          if (receipt.discountMinor > 0)
+                            _ReceiptRow(
+                              label: 'Discount',
+                              amountMinor: receipt.discountMinor,
+                            ),
+                          if (receipt.taxMinor > 0)
+                            _ReceiptRow(
+                              label: 'Tax',
+                              amountMinor: receipt.taxMinor,
+                            ),
+                          _ReceiptRow(
                             label: 'Total',
-                            amountMinor: _sale!.totalMinor,
+                            amountMinor: receipt.totalMinor,
                             emphasize: true,
                           ),
                           _ReceiptRow(
                             label: 'Paid',
-                            amountMinor: _sale!.amountPaidMinor,
+                            amountMinor: receipt.amountPaidMinor,
                           ),
-                          if (_sale!.changeMinor > 0)
+                          if (receipt.changeMinor > 0)
                             _ReceiptRow(
                               label: 'Change',
-                              amountMinor: _sale!.changeMinor,
+                              amountMinor: receipt.changeMinor,
                             ),
-                          if (_sale!.amountDueMinor > 0)
+                          if (receipt.amountDueMinor > 0)
                             _ReceiptRow(
                               label: 'Due',
-                              amountMinor: _sale!.amountDueMinor,
+                              amountMinor: receipt.amountDueMinor,
                             ),
                           const SizedBox(height: 8),
                           Text(
-                            'Method: ${_sale!.paymentMethod.toUpperCase()}',
+                            'Method: ${receipt.paymentMethod.toUpperCase()}',
                             style: theme.textTheme.bodySmall,
                           ),
+                          if (receipt.footer.trim().isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              receipt.footer.trim(),
+                              style: theme.textTheme.bodySmall,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ],
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (receipt != null)
+                  OutlinedButton.icon(
+                    onPressed: _print,
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('Print receipt'),
+                  ),
+                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () => AppNavigator.toMainShell(context),
                   icon: const Icon(Icons.home_outlined),

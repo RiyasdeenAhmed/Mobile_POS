@@ -175,16 +175,16 @@ Nothing is marked complete without implementation and test evidence.
 ## M9 — Receipts and thermal printing
 
 - [x] Receipt preview screen loading real sale data
-- [ ] `Receipt` model (shop, invoice, date, cashier, customer, items, totals, payment, received, change, footer)
-- [ ] Settings-driven receipt preview (store name, currency, footer)
-- [ ] `PrinterService` interface
-- [ ] ESC/POS receipt builder
-- [ ] Mock/no-op printer implementation (default)
-- [ ] Post-commit print after checkout success
-- [ ] Printer failure shows "Sale completed — printing failed" and permits reprint
-- [ ] Reprint action on receipt and sale detail
-- [ ] Printer configuration in settings
-- [ ] Tests: builder output, sale succeeds when printer throws, reprint
+- [x] `Receipt` model (shop, invoice, date, cashier, customer, items, totals, payment, received, change, footer)
+- [x] Settings-driven receipt preview (store name, currency, footer)
+- [x] `PrinterService` interface
+- [x] ESC/POS receipt builder
+- [x] Mock/no-op printer implementation (default)
+- [x] Post-commit print after checkout success (`auto_print_receipt`)
+- [x] Printer failure shows "Sale completed — printing failed" and permits reprint
+- [x] Reprint action on receipt and sale detail
+- [x] Printer configuration in settings (`printer_enabled`, `printer_name`, `printer_width` keys; editable UI in M11)
+- [x] Tests: builder output, sale succeeds when printer throws, reprint (13 tests)
 
 ## M10 — Dashboard, sales history, returns foundation
 
