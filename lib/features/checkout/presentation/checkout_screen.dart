@@ -52,33 +52,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _customerLoading = false);
   }
 
+  static const Object _walkInChoice = Object();
+
   Future<void> _pickCustomer() async {
     setState(() => _customerLoading = true);
     final repository = context.read<CustomerRepository>();
     final customers = await repository.list();
     if (!mounted) return;
     setState(() => _customerLoading = false);
-    if (customers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No active customers available')),
-      );
-      return;
-    }
-    final selected = await showModalBottomSheet<Customer>(
+
+    final selected = await showModalBottomSheet<Object>(
       context: context,
       builder: (sheetContext) {
         return SafeArea(
           child: ListView.builder(
             shrinkWrap: true,
-            itemCount: customers.length,
+            itemCount: customers.length + 1,
             itemBuilder: (context, index) {
-              final customer = customers[index];
+              if (index == 0) {
+                return ListTile(
+                  leading: const Icon(Icons.person_off_outlined),
+                  title: const Text('Walk-in customer'),
+                  subtitle: const Text('No customer account'),
+                  selected: _selectedCustomer == null,
+                  onTap: () => Navigator.of(sheetContext).pop(_walkInChoice),
+                );
+              }
+              final customer = customers[index - 1];
               return ListTile(
                 title: Text(customer.name),
                 subtitle: Text(
                   'Balance ${MoneyFormat.format(customer.balanceMinor)} · '
                   'Limit ${MoneyFormat.format(customer.creditLimitMinor)}',
                 ),
+                selected: _selectedCustomer?.uuid == customer.uuid,
                 onTap: () => Navigator.of(sheetContext).pop(customer),
               );
             },
@@ -86,7 +93,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       },
     );
-    if (selected != null && mounted) {
+    if (!mounted) return;
+    if (selected == _walkInChoice) {
+      setState(() => _selectedCustomer = null);
+    } else if (selected is Customer) {
       setState(() => _selectedCustomer = selected);
     }
   }
@@ -127,6 +137,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           : null,
       customerUuid: _selectedCustomer?.uuid,
       staffUuid: context.read<StaffSession>().staffUuid,
+      notes: cart.note.trim().isEmpty ? null : cart.note.trim(),
     );
     final result = await service.completeSale(request);
     if (!mounted) return;
@@ -271,31 +282,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ],
-          if (_paymentMethod == PaymentMethods.credit) ...[
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: Text(
-                  _selectedCustomer?.name ?? 'Select customer',
-                ),
-                subtitle: _selectedCustomer == null
-                    ? const Text('Required for credit sales')
-                    : Text(
-                        'Balance ${MoneyFormat.format(_selectedCustomer!.balanceMinor)} · '
-                        'Limit ${MoneyFormat.format(_selectedCustomer!.creditLimitMinor)}',
-                      ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: _submitting ? null : _pickCustomer,
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text(
+                _selectedCustomer?.name ?? 'Walk-in customer',
+              ),
+              subtitle: _selectedCustomer != null
+                  ? Text(
+                      'Balance ${MoneyFormat.format(_selectedCustomer!.balanceMinor)} · '
+                      'Limit ${MoneyFormat.format(_selectedCustomer!.creditLimitMinor)}',
+                    )
+                  : Text(
+                      _paymentMethod == PaymentMethods.credit
+                          ? 'Required for credit sales'
+                          : 'No customer account — cash sale',
+                    ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _submitting ? null : _pickCustomer,
+            ),
+          ),
+          if (_customerLoading)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: LinearProgressIndicator(
+                color: theme.colorScheme.primary,
               ),
             ),
-            if (_customerLoading)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: LinearProgressIndicator(
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-          ],
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _canSubmit ? _completeSale : null,

@@ -132,4 +132,109 @@ void main() {
     expect(cart.totalMinor, 0);
     expect(cart.itemCount, 0);
   });
+
+  group('stock caps', () {
+    test('addItem caps a new line at the available stock', () {
+      final cart = CartController();
+      final result = cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 3),
+        quantity: 5,
+      ));
+      expect(result, CartChangeResult.capped);
+      expect(cart.items.single.quantity, 3);
+    });
+
+    test('addItem refuses an out-of-stock product', () {
+      final cart = CartController();
+      final result = cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 0),
+      ));
+      expect(result, CartChangeResult.outOfStock);
+      expect(cart.isEmpty, isTrue);
+    });
+
+    test('adding past the cap reports atLimit without changing quantity', () {
+      final cart = CartController();
+      cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 2),
+      ));
+      final full = cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 2),
+      ));
+      expect(full, CartChangeResult.ok, reason: 'second unit fills the cap');
+      final result = cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 2),
+      ));
+      expect(result, CartChangeResult.atLimit);
+      expect(cart.items.single.quantity, 2);
+    });
+
+    test('adding the same product again keeps the line discount', () {
+      final cart = CartController();
+      cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 10),
+      ));
+      cart.setDiscount('p1', 150);
+      final result = cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 10),
+      ));
+      expect(result, CartChangeResult.ok);
+      expect(cart.items.single.quantity, 2);
+      expect(cart.items.single.discountMinor, 150);
+    });
+
+    test('increment stops at the stock limit', () {
+      final cart = CartController();
+      cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 2),
+      ));
+      expect(cart.increment('p1'), CartChangeResult.ok);
+      expect(cart.items.single.quantity, 2);
+      expect(cart.increment('p1'), CartChangeResult.atLimit);
+      expect(cart.items.single.quantity, 2);
+    });
+
+    test('setQuantity clamps to the stock level', () {
+      final cart = CartController();
+      cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Beans', stock: 4),
+      ));
+      expect(cart.setQuantity('p1', 99), CartChangeResult.capped);
+      expect(cart.items.single.quantity, 4);
+      expect(cart.setQuantity('p1', 0), CartChangeResult.ok);
+      expect(cart.isEmpty, isTrue);
+    });
+
+    test('untracked products are never capped', () {
+      final cart = CartController();
+      final result = cart.addItem(CartItem.fromProduct(
+        _product(uuid: 'p1', name: 'Delivery fee', stock: 0, trackStock: false),
+        quantity: 50,
+      ));
+      expect(result, CartChangeResult.ok);
+      expect(cart.items.single.quantity, 50);
+    });
+  });
+
+  group('discounts and notes', () {
+    test('setDiscount clamps to zero and to the line total', () {
+      final cart = CartController();
+      cart.addItem(_item(uuid: 'p1', name: 'Beans', price: 500, quantity: 2));
+
+      cart.setDiscount('p1', -100);
+      expect(cart.discountMinor, 0);
+
+      cart.setDiscount('p1', 99999);
+      expect(cart.discountMinor, 1000, reason: 'line gross is 1000');
+      expect(cart.totalMinor, 0);
+    });
+
+    test('note is stored and cleared with the cart', () {
+      final cart = CartController();
+      cart.note = 'Pack separately';
+      expect(cart.note, 'Pack separately');
+      cart.clear();
+      expect(cart.note, isEmpty);
+    });
+  });
 }

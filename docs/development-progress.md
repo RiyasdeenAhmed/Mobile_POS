@@ -125,9 +125,12 @@ Nothing is marked complete without implementation and test evidence.
 - [x] New Sale screen with product search
 - [x] Cart screen with quantity edit and remove
 - [x] Persistent bottom cart summary
-- [ ] Category filter chips on New Sale
-- [ ] Walk-in customer support at checkout
-- [ ] Cart quantity blocked against available stock in the UI
+- [x] Category filter chips on New Sale (combined with search, reloads on return)
+- [x] Walk-in customer support at checkout (always-visible customer card, walk-in choice in picker sheet, `CartController.note` passed as `CheckoutRequest.notes`)
+- [x] Cart quantity blocked against available stock in the UI (`CartItem.availableStock` snapshot, add-to-cart capping with feedback snackbar, steppers capped/disabled at stock with "Maximum stock reached")
+- [x] Line discounts (clamped to line gross) and order note in cart (dialog controller owned by screen state)
+- [x] "View Cart" action in the New Sale bottom bar (`N items · Money · [View Cart]`)
+- [x] Tests: cart caps/discounts/notes (16 unit) + New Sale / Cart / Checkout widget tests (3); suite at 145
 
 ## M6 — Checkout and sale transactions
 
@@ -245,3 +248,7 @@ Every milestone must pass before proceeding:
   tradeoff, mitigated by forcing a PIN change on first login.
 - **No backups or sync** — Phase 1 is local-only by design.
 - **No returns UI yet** — returns ship as schema and service only.
+- **Currency symbol not wired to settings** — `app_settings` seeds
+  `currency_symbol = 'Rs'`, but the UI renders `$` via
+  `MoneyFormat.defaultSymbol`; threading the setting through formatting is
+  deferred to the settings/UI pass.

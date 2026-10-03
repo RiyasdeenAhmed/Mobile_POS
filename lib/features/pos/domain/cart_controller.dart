@@ -18,10 +18,34 @@ class CartTotals {
   });
 }
 
+/// Result of an attempted cart change, so the UI can explain what happened.
+enum CartChangeResult {
+  /// The cart now holds the requested quantity.
+  ok,
+
+  /// The request exceeded available stock; the cart was capped.
+  capped,
+
+  /// The line is already at the stock limit; nothing changed.
+  atLimit,
+
+  /// The product has no stock left; nothing was added.
+  outOfStock,
+}
+
 class CartController extends ChangeNotifier {
   final List<CartItem> _items = <CartItem>[];
+  String _note = '';
 
   List<CartItem> get items => List<CartItem>.unmodifiable(_items);
+
+  String get note => _note;
+
+  set note(String value) {
+    if (_note == value) return;
+    _note = value;
+    notifyListeners();
+  }
 
   bool get isEmpty => _items.isEmpty;
 
@@ -58,40 +82,71 @@ class CartController extends ChangeNotifier {
 
   int get itemCount => totals.itemCount;
 
-  void addItem(CartItem item) {
+  CartChangeResult addItem(CartItem item) {
+    final cap = item.maxQuantity;
     final index =
         _items.indexWhere((element) => element.productUuid == item.productUuid);
+
     if (index >= 0) {
       final existing = _items[index];
+      final existingCap = existing.maxQuantity;
+      if (existing.quantity >= existingCap) {
+        return CartChangeResult.atLimit;
+      }
+      final requested = existing.quantity + item.quantity;
+      final next = requested > existingCap ? existingCap : requested;
       _items[index] = existing.copyWith(
-        quantity: existing.quantity + item.quantity,
-        discountMinor: item.discountMinor,
+        quantity: next,
+        // Adding the same product again never wipes the line discount.
+        discountMinor: existing.discountMinor,
       );
-    } else {
-      _items.add(item);
+      notifyListeners();
+      return next < requested ? CartChangeResult.capped : CartChangeResult.ok;
     }
+
+    if (item.trackStock && item.quantity > cap) {
+      if (cap <= 0) return CartChangeResult.outOfStock;
+      _items.add(item.copyWith(quantity: cap));
+      notifyListeners();
+      return CartChangeResult.capped;
+    }
+    _items.add(item);
     notifyListeners();
+    return CartChangeResult.ok;
   }
 
-  void setQuantity(String productUuid, double quantity) {
+  CartChangeResult setQuantity(String productUuid, double quantity) {
     final index =
         _items.indexWhere((element) => element.productUuid == productUuid);
-    if (index < 0) return;
+    if (index < 0) return CartChangeResult.ok;
     if (quantity <= 0) {
       _items.removeAt(index);
-    } else {
-      _items[index] = _items[index].copyWith(quantity: quantity);
+      notifyListeners();
+      return CartChangeResult.ok;
     }
+    final existing = _items[index];
+    final cap = existing.maxQuantity;
+    final clamped = quantity > cap ? cap : quantity;
+    if (clamped == existing.quantity) {
+      return quantity > cap ? CartChangeResult.capped : CartChangeResult.ok;
+    }
+    _items[index] = existing.copyWith(quantity: clamped);
     notifyListeners();
+    return clamped < quantity ? CartChangeResult.capped : CartChangeResult.ok;
   }
 
-  void increment(String productUuid) {
+  CartChangeResult increment(String productUuid) {
     final index =
         _items.indexWhere((element) => element.productUuid == productUuid);
-    if (index < 0) return;
+    if (index < 0) return CartChangeResult.ok;
     final existing = _items[index];
-    _items[index] = existing.copyWith(quantity: existing.quantity + 1);
+    final cap = existing.maxQuantity;
+    if (existing.quantity >= cap) return CartChangeResult.atLimit;
+    final next = existing.quantity + 1;
+    final capped = next > cap;
+    _items[index] = existing.copyWith(quantity: capped ? cap : next);
     notifyListeners();
+    return capped ? CartChangeResult.capped : CartChangeResult.ok;
   }
 
   void decrement(String productUuid) {
@@ -113,8 +168,24 @@ class CartController extends ChangeNotifier {
     notifyListeners();
   }
 
+  CartChangeResult setDiscount(String productUuid, int discountMinor) {
+    final index =
+        _items.indexWhere((element) => element.productUuid == productUuid);
+    if (index < 0) return CartChangeResult.ok;
+    final existing = _items[index];
+    final lineTotal = existing.lineGrossMinor;
+    var discount = discountMinor;
+    if (discount < 0) discount = 0;
+    if (discount > lineTotal) discount = lineTotal;
+    if (discount == existing.discountMinor) return CartChangeResult.ok;
+    _items[index] = existing.copyWith(discountMinor: discount);
+    notifyListeners();
+    return CartChangeResult.ok;
+  }
+
   void clear() {
     _items.clear();
+    _note = '';
     notifyListeners();
   }
 }

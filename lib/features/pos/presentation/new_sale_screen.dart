@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import '../../../app/routes.dart';
 import '../../../core/theme/money_text.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../categories/data/category_repository.dart';
+import '../../categories/domain/category.dart';
 import '../../products/data/product_repository.dart';
 import '../../products/domain/product.dart';
-import '../../pos/domain/cart_controller.dart';
-import '../../pos/domain/cart_item.dart';
+import '../domain/cart_controller.dart';
+import '../domain/cart_item.dart';
 
 class NewSaleScreen extends StatefulWidget {
   const NewSaleScreen({super.key});
@@ -19,13 +21,15 @@ class NewSaleScreen extends StatefulWidget {
 class _NewSaleScreenState extends State<NewSaleScreen> {
   final _searchController = TextEditingController();
   List<Product> _products = <Product>[];
+  List<Category> _categories = const <Category>[];
+  int? _selectedCategoryId;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProducts();
+      _loadData();
     });
   }
 
@@ -35,23 +39,41 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadData() async {
     setState(() => _loading = true);
-    final repository = context.read<ProductRepository>();
-    final products = await repository.search(_searchController.text);
+    final productRepository = context.read<ProductRepository>();
+    final categoryRepository = context.read<CategoryRepository>();
+    final products = await productRepository.search(_searchController.text);
+    final categories = await categoryRepository.list();
     if (!mounted) return;
     setState(() {
       _products = products;
+      _categories = categories;
       _loading = false;
     });
   }
 
+  List<Product> get _visibleProducts {
+    if (_selectedCategoryId == null) return _products;
+    return _products
+        .where((product) => product.categoryId == _selectedCategoryId)
+        .toList();
+  }
+
   void _addToCart(Product product) {
     final cart = context.read<CartController>();
-    cart.addItem(CartItem.fromProduct(product));
+    final result = cart.addItem(CartItem.fromProduct(product));
+    final message = switch (result) {
+      CartChangeResult.ok => 'Added ${product.name}',
+      CartChangeResult.capped => 'Added ${product.name} — only '
+          '${product.stockQuantity.toStringAsFixed(0)} in stock',
+      CartChangeResult.atLimit => 'Only '
+          '${product.stockQuantity.toStringAsFixed(0)} in stock',
+      CartChangeResult.outOfStock => '${product.name} is out of stock',
+    };
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added ${product.name}'),
+        content: Text(message),
         duration: const Duration(milliseconds: 1200),
       ),
     );
@@ -62,6 +84,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     final theme = Theme.of(context);
     final cart = context.watch<CartController>();
     final totals = cart.totals;
+    final visible = _visibleProducts;
 
     return Scaffold(
       appBar: AppBar(
@@ -88,59 +111,91 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                 hintText: 'Search products or scan barcode',
                 prefixIcon: Icon(Icons.search),
               ),
-              onChanged: (_) => _loadProducts(),
-              onSubmitted: (_) => _loadProducts(),
+              onChanged: (_) => _loadData(),
+              onSubmitted: (_) => _loadData(),
+            ),
+          ),
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: const Text('All'),
+                    selected: _selectedCategoryId == null,
+                    onSelected: (_) =>
+                        setState(() => _selectedCategoryId = null),
+                  ),
+                ),
+                ..._categories.map(
+                  (category) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(category.name),
+                      selected: _selectedCategoryId == category.id,
+                      onSelected: (_) => setState(
+                        () => _selectedCategoryId = category.id,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _products.isEmpty
+                : visible.isEmpty
                     ? EmptyState(
                         icon: Icons.inventory_2_outlined,
-                        title: 'No products found',
-                        message: 'Add inventory or refine your search.',
+                        title: _products.isEmpty
+                            ? 'No products found'
+                            : 'Nothing in this category',
+                        message: _products.isEmpty
+                            ? 'Add inventory or refine your search.'
+                            : 'Pick another category or clear your search.',
                         action: ElevatedButton(
                           onPressed: () => AppNavigator.toProducts(context),
                           child: const Text('Manage products'),
                         ),
                       )
                     : ListView.separated(
-                        itemCount: _products.length,
+                        itemCount: visible.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (context, index) {
-                          final product = _products[index];
+                          final product = visible[index];
+                          final out =
+                              product.trackStock && product.stockQuantity <= 0;
+                          final low = product.trackStock &&
+                              product.reorderLevel > 0 &&
+                              product.stockQuantity <= product.reorderLevel;
+                          final stockColor = out
+                              ? const Color(0xFFB00020)
+                              : low
+                                  ? const Color(0xFFB86E00)
+                                  : theme.colorScheme.outline;
                           return ListTile(
                             title: Text(product.name),
                             subtitle: Text(
                               [
                                 if (product.sku != null) product.sku!,
                                 if (product.barcode != null) product.barcode!,
-                                'Stock ${product.stockQuantity.toStringAsFixed(0)}',
+                                product.trackStock
+                                    ? 'Stock ${product.stockQuantity.toStringAsFixed(0)}'
+                                        '${out ? ' · Out of stock' : low ? ' · Low stock' : ''}'
+                                    : 'Not tracked',
                               ].join(' · '),
+                              style: TextStyle(color: stockColor),
                             ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                MoneyText(
-                                  amountMinor: product.sellingPriceMinor,
-                                  style: theme.textTheme.titleMedium,
-                                ),
-                                Text(
-                                  product.trackStock
-                                      ? (product.stockQuantity > 0
-                                          ? 'In stock'
-                                          : 'Out of stock')
-                                      : 'Not tracked',
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                              ],
+                            trailing: MoneyText(
+                              amountMinor: product.sellingPriceMinor,
+                              style: theme.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
-                            onTap:
-                                product.trackStock && product.stockQuantity <= 0
-                                    ? null
-                                    : () => _addToCart(product),
+                            onTap: out ? null : () => _addToCart(product),
                           );
                         },
                       ),
@@ -156,26 +211,23 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Cart', style: theme.textTheme.titleSmall),
-                        Text(
-                          '${totals.itemCount} items',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
+                    child: Text(
+                      '${totals.itemCount} '
+                      'item${totals.itemCount == 1 ? '' : 's'}',
+                      style: theme.textTheme.titleSmall,
                     ),
                   ),
-                  Text('Total', style: theme.textTheme.titleSmall),
-                  const SizedBox(width: 8),
-                  MoneyText(amountMinor: totals.totalMinor),
+                  MoneyText(
+                    amountMinor: totals.totalMinor,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(width: 12),
-                  ElevatedButton(
+                  FilledButton(
                     onPressed: cart.isEmpty
                         ? null
-                        : () => AppNavigator.toCheckout(context),
-                    child: const Text('Checkout'),
+                        : () => AppNavigator.toCart(context),
+                    child: const Text('View Cart'),
                   ),
                 ],
               ),
