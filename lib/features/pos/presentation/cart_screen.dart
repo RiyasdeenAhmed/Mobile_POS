@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/money_text.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../domain/cart_controller.dart';
 import '../domain/cart_item.dart';
@@ -35,12 +36,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _showLimit(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(milliseconds: 1200),
-      ),
-    );
+    showAppSnack(context, message);
   }
 
   Future<void> _editDiscount(CartItem item) async {
@@ -153,7 +149,8 @@ class _CartScreenState extends State<CartScreen> {
                   )
                 : ListView.separated(
                     itemCount: cart.items.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    padding: const EdgeInsets.all(16),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = cart.items[index];
                       final atCap =
@@ -196,7 +193,7 @@ class _CartScreenState extends State<CartScreen> {
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               border: Border(top: BorderSide(color: theme.dividerColor)),
             ),
             child: SafeArea(
@@ -267,7 +264,10 @@ class _CartLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
+    return Container(
+      decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(28)),
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

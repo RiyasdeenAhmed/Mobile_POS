@@ -7,6 +7,7 @@ class StaffUser {
   final String displayName;
   final String role;
   final String? passwordHash;
+  final int? pinLength;
   final bool mustChangePin;
   final bool isActive;
   final bool isArchived;
@@ -20,6 +21,7 @@ class StaffUser {
     required this.displayName,
     this.role = 'cashier',
     this.passwordHash,
+    this.pinLength,
     this.mustChangePin = false,
     this.isActive = true,
     this.isArchived = false,
@@ -37,6 +39,7 @@ class StaffUser {
     String? displayName,
     String? role,
     String? passwordHash,
+    int? pinLength,
     bool? mustChangePin,
     bool? isActive,
     bool? isArchived,
@@ -50,6 +53,7 @@ class StaffUser {
       displayName: displayName ?? this.displayName,
       role: role ?? this.role,
       passwordHash: passwordHash ?? this.passwordHash,
+      pinLength: pinLength ?? this.pinLength,
       mustChangePin: mustChangePin ?? this.mustChangePin,
       isActive: isActive ?? this.isActive,
       isArchived: isArchived ?? this.isArchived,
@@ -66,6 +70,7 @@ class StaffUser {
       'display_name': displayName,
       'role': role,
       'password_hash': passwordHash,
+      if (pinLength != null) 'pin_length': pinLength,
       'must_change_pin': mustChangePin ? 1 : 0,
       'is_active': isActive ? 1 : 0,
       'is_archived': isArchived ? 1 : 0,
@@ -82,6 +87,7 @@ class StaffUser {
       displayName: map['display_name'] as String,
       role: (map['role'] as String?) ?? 'cashier',
       passwordHash: map['password_hash'] as String?,
+      pinLength: (map['pin_length'] as num?)?.toInt(),
       mustChangePin: ((map['must_change_pin'] as int?) ?? 0) == 1,
       isActive: ((map['is_active'] as int?) ?? 1) == 1,
       isArchived: ((map['is_archived'] as int?) ?? 0) == 1,

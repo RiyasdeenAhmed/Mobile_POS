@@ -1,7 +1,9 @@
+import '../../../app/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/money_text.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../categories/data/category_repository.dart';
 import '../../categories/domain/category.dart';
 import '../data/product_repository.dart';
@@ -178,15 +180,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       setState(() => _saving = false);
       result.when(
         success: (product) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Updated ${product.name}')),
-          );
+          showAppSnack(context, 'Updated ${product.name}');
           Navigator.of(context).pop(true);
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(failure.message)),
-          );
+          showAppSnack(context, failure.message, kind: AppSnackKind.error);
         },
       );
       return;
@@ -211,15 +209,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     setState(() => _saving = false);
     result.when(
       success: (Product product) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Created ${product.name}')),
-        );
+        showAppSnack(context, 'Created ${product.name}');
         Navigator.of(context).pop(true);
       },
       failure: (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(failure.message)),
-        );
+        showAppSnack(context, failure.message, kind: AppSnackKind.error);
       },
     );
   }
@@ -244,7 +238,30 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? 'Edit product' : 'New product')),
+      appBar: AppBar(
+          title: Text(_isEdit ? 'Edit product' : 'New product'),
+          actions: [
+            if (_existing != null)
+              IconButton(
+                  tooltip: 'Barcode Labels',
+                  icon: const Icon(Icons.barcode_reader),
+                  onPressed: () async {
+                    final repository = context.read<ProductRepository>();
+                    await AppNavigator.pushNamed(
+                        context, AppRoutes.barcodeLabels,
+                        arguments: _existing!.uuid);
+                    if (mounted) {
+                      final refreshed = await repository.findByUuid(_existing!.uuid);
+                      if (mounted && refreshed != null) {
+                        setState(() {
+                          _existing =
+                              _existing!.copyWith(barcode: refreshed.barcode);
+                          _barcodeController.text = refreshed.barcode ?? '';
+                        });
+                      }
+                    }
+                  })
+          ]),
       body: Form(
         key: _formKey,
         child: ListView(

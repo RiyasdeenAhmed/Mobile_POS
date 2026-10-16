@@ -62,6 +62,138 @@ void main() {
     return CartItem.fromProduct(product, quantity: quantity);
   }
 
+  for (final method in [
+    PaymentMethods.creditCard,
+    PaymentMethods.debitCard,
+    PaymentMethods.qr
+  ]) {
+    test('records $method with reference', () async {
+      final product = await createProduct();
+      final result = await checkout.completeSale(CheckoutRequest(
+          items: [cartFromProduct(product)],
+          paymentMethod: method,
+          cardReference: 'ref-42'));
+      expect(result.isSuccess, isTrue);
+      expect(result.dataOrNull!.payments.single.paymentMethod, method);
+      expect(result.dataOrNull!.payments.single.reference, 'ref-42');
+      expect(
+          (await sales.listPayments(result.dataOrNull!.sale.id!))
+              .single
+              .amountMinor,
+          1200);
+    });
+  }
+
+  test('split persists all payments, change, stock, and retries once',
+      () async {
+    final product = await createProduct();
+    final request = CheckoutRequest(
+        items: [cartFromProduct(product)],
+        saleUuid: 'split-retry',
+        paymentMethod: PaymentMethods.split,
+        allocations: const [
+          PaymentAllocation(
+              method: PaymentMethods.cash,
+              amountMinor: 500,
+              receivedMinor: 1000),
+          PaymentAllocation(
+              method: PaymentMethods.qr, amountMinor: 700, reference: 'qr-1')
+        ]);
+    final first = await checkout.completeSale(request);
+    expect(first.isSuccess, isTrue, reason: first.failureOrNull?.message);
+    final retry = await checkout.completeSale(request);
+    expect(retry.dataOrNull!.payments, hasLength(2));
+    expect(first.dataOrNull!.changeMinor, 500);
+    expect(await sales.count(), 1);
+    expect(await sales.list(paymentMethod: 'qr'), hasLength(1));
+    expect(await sales.list(paymentMethod: 'split'), hasLength(1));
+    expect((await products.findByUuid(product.uuid))!.stockQuantity, 9);
+    expect(
+        (await sales.listPayments(first.dataOrNull!.sale.id!))
+            .map((p) => p.amountMinor),
+        [500, 700]);
+  });
+
+  test('invalid split allocations never change stock or financial records',
+      () async {
+    final product = await createProduct();
+    for (final allocations in [
+      [
+        const PaymentAllocation(
+            method: 'cash', amountMinor: 500, receivedMinor: 500)
+      ],
+      [
+        const PaymentAllocation(
+            method: 'cash', amountMinor: 500, receivedMinor: 500),
+        const PaymentAllocation(method: 'qr', amountMinor: 600)
+      ],
+      [
+        const PaymentAllocation(
+            method: 'cash', amountMinor: 500, receivedMinor: 400),
+        const PaymentAllocation(method: 'qr', amountMinor: 700)
+      ],
+      [
+        const PaymentAllocation(method: 'credit', amountMinor: 500),
+        const PaymentAllocation(method: 'qr', amountMinor: 700)
+      ],
+      [
+        const PaymentAllocation(method: 'qr', amountMinor: 500),
+        const PaymentAllocation(method: 'qr', amountMinor: 700)
+      ],
+    ]) {
+      final result = await checkout.completeSale(CheckoutRequest(
+          items: [cartFromProduct(product)],
+          paymentMethod: PaymentMethods.split,
+          allocations: allocations));
+      expect(result.isFailure, isTrue);
+    }
+    expect(await sales.count(), 0);
+    expect(await db.db.query('payments'), isEmpty);
+    expect((await products.findByUuid(product.uuid))!.stockQuantity, 10);
+  });
+
+  test('split payment insert failure rolls back every write', () async {
+    final product = await createProduct();
+    await db.db.execute(
+        "CREATE TRIGGER fail_qr BEFORE INSERT ON payments WHEN NEW.payment_method = 'qr' BEGIN SELECT RAISE(ABORT, 'test failure'); END");
+    final result = await checkout.completeSale(CheckoutRequest(
+        items: [cartFromProduct(product)],
+        paymentMethod: PaymentMethods.split,
+        allocations: const [
+          PaymentAllocation(
+              method: 'cash', amountMinor: 500, receivedMinor: 500),
+          PaymentAllocation(method: 'qr', amountMinor: 700)
+        ]));
+    expect(result.isFailure, isTrue);
+    expect(await sales.count(), 0);
+    expect(await db.db.query('payments'), isEmpty);
+    expect(await db.db.query('sale_items'), isEmpty);
+    expect(
+        await db.db.query('stock_movements', where: "movement_type = 'sale'"),
+        isEmpty);
+    expect((await products.findByUuid(product.uuid))!.stockQuantity, 10);
+  });
+
+  test('deleting a sold product preserves receipts and blocks new checkout',
+      () async {
+    final product = await createProduct(barcode: '12345678');
+    final sale = (await checkout.completeSale(CheckoutRequest(
+            items: [cartFromProduct(product)],
+            paymentMethod: PaymentMethods.qr)))
+        .dataOrNull!;
+    expect((await products.archive(product.uuid)).isSuccess, isTrue);
+    expect(await products.list(), isEmpty);
+    final history = await sales.listItems(sale.sale.id!);
+    expect(history.single.productName, product.name);
+    expect(history.single.productBarcode, '12345678');
+    expect((await sales.listPayments(sale.sale.id!)).single.amountMinor, 1200);
+    final blocked = await checkout.completeSale(CheckoutRequest(
+        items: [cartFromProduct(product)], paymentMethod: PaymentMethods.qr));
+    expect(blocked.isFailure, isTrue);
+    expect(await sales.count(), 1);
+    expect((await products.findByUuid(product.uuid))!.stockQuantity, 9);
+  });
+
   test('completeSale applies configured tax in basis points', () async {
     await SettingsRepository(db).setString('tax_rate_bps', '1800');
     final product = await createProduct(name: 'Latte', price: 1000, stock: 5);
@@ -364,6 +496,34 @@ void main() {
     );
     expect(outcome.isFailure, isTrue);
     expect(outcome.failureOrNull?.code, 'credit_limit_exceeded');
+  });
+
+  test('credit sales are blocked when the credit flag is off', () async {
+    final product = await createProduct(price: 500, stock: 2);
+    final customer = (await customers.create(
+      name: 'Switched Off',
+      creditLimitMinor: 10000,
+      creditEnabled: false,
+    ))
+        .dataOrNull!;
+    expect(customer.creditEnabled, isFalse);
+
+    final outcome = await checkout.completeSale(
+      CheckoutRequest(
+        items: [cartFromProduct(product)],
+        paymentMethod: PaymentMethods.credit,
+        customerUuid: customer.uuid,
+      ),
+    );
+    expect(outcome.isFailure, isTrue);
+    expect(outcome.failureOrNull?.code, 'credit_limit_exceeded');
+
+    // Nothing moved: balance, stock and ledger stay untouched.
+    final refreshed = await customers.findByUuid(customer.uuid);
+    expect(refreshed!.balanceMinor, 0);
+    final refreshedProduct = await products.findByUuid(product.uuid);
+    expect(refreshedProduct!.stockQuantity, 2);
+    expect(await db.db.query('customer_ledger'), isEmpty);
   });
 
   test('invoice numbers increment uniquely', () async {

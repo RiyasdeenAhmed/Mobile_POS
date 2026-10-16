@@ -223,9 +223,67 @@ Nothing is marked complete without implementation and test evidence.
 - [x] `flutter analyze` clean
 - [x] `flutter test -j 1` all passing (207 tests, 33 files)
 
+## M13 — Bug-fix and UX hardening pass (Phases 1–9)
+
+- [x] **Sales page root cause fixed** — the dashboard "Sales" quick action
+  pushed a bare `SalesScreen` (a `Column` of `DropdownButton`/`FilterChip`/
+  `ListTile` with no Material ancestor) → `debugCheckHasMaterial` assert in
+  debug and an InkWell crash in release; the shell tab only worked because its
+  Scaffold supplied Material. `/sales` and `/more` routes are now wrapped in
+  `Scaffold`; SalesScreen uses local-calendar-day windows, an `_requestId`
+  sequence token against stale loads, an error state with Try again, and
+  pull-to-refresh on every branch (`sales_route_test`, 4 cases).
+- [x] **Product row tap → Edit screen** — discovered `AppNavigator.
+  toProductForm<bool>` crashed: `Navigator._routeNamed` casts
+  `MaterialPageRoute<void>` to `Route<bool?>` (TypeError), breaking both row
+  taps and the Add-product FAB. Fixed by pushing untyped; regression tests in
+  `products_screen_test.dart`.
+- [x] **Centralized snackbars** — `core/widgets/app_snack.dart` with
+  `AppSnackDurations.info` (1800 ms) / `.error` (3000 ms) and error styling;
+  every `showSnackBar` call site migrated (16 files).
+- [x] **Customer credit flags** — migration v5 adds `customers.credit_enabled`
+  (backfilled from `credit_limit_minor > 0`), `Customer.creditEnabled`,
+  service blocks credit sales when the flag is off
+  (`credit_limit_exceeded`), Allow-credit switch + validator on the customer
+  form, checkout picker offers only credit-enabled customers for Credit.
+- [x] **Dashboard global search** — 300 ms debounced, grouped
+  Products/Customers/Invoices results (LIMIT 8 per group) replacing the quick
+  actions while typing, tap-through to edit form / account / invoice detail,
+  no-match and retry states (`dashboard_search_test`, 4 cases).
+- [x] **Light and dark themes** — full `QubeXCoreTheme.dark()` rebuild
+  (`#0D0D0F` background, `#17171A`/`#1E1E22` surfaces, `#F9F9F9`/`#A7A7A7`
+  text, `#0066FF` accent, dark snackBarTheme); `ThemeController` defaults to
+  System and persists under `theme_mode`; Appearance section in Settings
+  applies immediately; `main.dart` preloads the mode before the first frame.
+- [x] **Shared stock status** — `core/widgets/stock_status.dart`
+  (`resolveStockStatus`: untracked → out (≤0) → low (≤ reorder) → in stock;
+  labels In Stock / Low Stock / Out of Stock / Not Tracked; low = light red
+  `#FDECEC` on `#C62828`, out = solid `#C62828`); applied to products,
+  inventory, new sale, and the dashboard low-stock metric (red when > 0).
+- [x] **PDF invoices** — added `pdf` and `share_plus`;
+  `features/invoices` ships a pure `InvoiceDocument` A4 builder and
+  `InvoicePdfService` {buildDocument, render, save, share}; Sale detail has a
+  Print Receipt / Download Invoice / Share Invoice action row; downloads land
+  in app documents `invoices/INV-x.pdf` with the path in a snackbar; tests
+  assert the `sales`/`sale_items` rows are byte-identical before and after.
+- [x] `flutter analyze` clean
+- [x] `flutter test -j 1` all passing (**235 tests**)
+
+Suggested commits for review:
+
+1. `fix(sales): wrap /sales route with Scaffold, local-day filters and hardened loads`
+2. `feat(ux): credit flags, dashboard search, dark mode, PDF invoices and notification/snack system`
+
 ---
 
 ## Milestone gate
+
+### Roadmap foundation update (2026-10-06)
+
+- Added schema v7 audit, backup, stocktake, and optional payment settings.
+- Added encrypted backup validation and restore safety-copy preparation.
+- Added staff session timeout state and a provider-neutral printer connection boundary.
+- Tap-to-Pay, Google Drive, and Bluetooth remain disabled until certified SDKs and device credentials are configured.
 
 Every milestone must pass before proceeding:
 
@@ -269,3 +327,13 @@ physical device (see `docs/hardware.md` and the checklist in
 - **Printer transport is a mock** — `MockPrinter` captures jobs; a real
   ESC/POS Bluetooth/USB transport still needs a device implementation
   (see `docs/hardware.md`).
+- **PDF fonts** — invoices use the built-in Helvetica (Latin-1) fonts;
+  non-Latin store/product names need an embedded font to render correctly.
+- **Share sheet on tablets** — no `sharePositionOrigin` is set, so iPad
+  popovers anchor at the default position.
+- **Dashboard stock surfacing** — the dashboard shows a low-stock count only
+  (red when > 0); per-product In/Low/Out badges live on Products and
+  Inventory.
+- **Theme flash on very cold starts** — `main.dart` preloads the saved
+  ThemeMode before `runApp`, but a rebuild/reinstall resets to System until
+  the mode is chosen again (by design, decision 1A).

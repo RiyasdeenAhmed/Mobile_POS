@@ -14,18 +14,21 @@ class DashboardMetrics {
   });
 }
 
-/// Dashboard aggregates for the current UTC day, matching `utcNowIso()`
-/// storage (UTC ISO-8601 strings compare lexicographically).
+/// Dashboard aggregates for the current local calendar day, stored as UTC
+/// ISO-8601 strings (UTC ISO-8601 strings compare lexicographically).
 class DashboardRepository {
   final AppDatabase database;
 
   DashboardRepository(this.database);
 
   ({String start, String end}) _todayWindow() {
-    final now = DateTime.now().toUtc();
-    final start = DateTime.utc(now.year, now.month, now.day);
-    final end = start.add(const Duration(days: 1));
-    return (start: start.toIso8601String(), end: end.toIso8601String());
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = DateTime(now.year, now.month, now.day + 1);
+    return (
+      start: start.toUtc().toIso8601String(),
+      end: end.toUtc().toIso8601String(),
+    );
   }
 
   Future<DashboardMetrics> metrics() async {

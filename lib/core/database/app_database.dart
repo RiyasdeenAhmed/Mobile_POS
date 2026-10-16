@@ -1,15 +1,19 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import 'migrations.dart';
 
 class AppDatabase {
-  static const int schemaVersion = 4;
+  static const int schemaVersion = 8;
   static const String defaultDbFileName = 'qubexcore.db';
 
   final Database db;
+  final String path;
+  final financialRevision = ValueNotifier<int>(0);
+  void financialChanged() => financialRevision.value++;
 
-  AppDatabase._(this.db);
+  AppDatabase._(this.db, this.path);
 
   static Future<AppDatabase> open({
     String? path,
@@ -23,7 +27,7 @@ class AppDatabase {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
-    return AppDatabase._(database);
+    return AppDatabase._(database, dbPath);
   }
 
   static Future<void> _onConfigure(Database db) async {
@@ -49,5 +53,8 @@ class AppDatabase {
     return value == 1 || value == '1' || value == true;
   }
 
-  Future<void> close() => db.close();
+  Future<void> close() async {
+    financialRevision.dispose();
+    await db.close();
+  }
 }

@@ -4,12 +4,29 @@ abstract final class PaymentMethods {
   static const String cash = 'cash';
   static const String card = 'card';
   static const String credit = 'credit';
-  static const Set<String> all = {cash, card, credit};
+  static const String creditCard = 'credit_card';
+  static const String debitCard = 'debit_card';
+  static const String qr = 'qr';
+  static const String split = 'split';
+  static const Set<String> paid = {cash, creditCard, debitCard, qr};
+  static const Set<String> all = {
+    cash,
+    card,
+    credit,
+    creditCard,
+    debitCard,
+    qr,
+    split
+  };
 
   static String labelOf(String method) => switch (method) {
         cash => 'Cash',
         card => 'Card',
-        credit => 'Credit',
+        credit => 'Customer credit',
+        creditCard => 'Credit card',
+        debitCard => 'Debit card',
+        qr => 'QR',
+        split => 'Split',
         _ => method,
       };
 }

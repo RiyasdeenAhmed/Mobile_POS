@@ -1,3 +1,7 @@
+import '../features/profit/presentation/profit_screen.dart';
+import '../features/expenses/presentation/expenses_screen.dart';
+import '../features/products/presentation/product_import_screen.dart';
+import '../features/barcode/presentation/barcode_labels_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../features/auth/presentation/change_pin_screen.dart';
@@ -23,6 +27,10 @@ import 'auth_gate.dart';
 import 'main_shell.dart';
 
 class AppRoutes {
+  static const profit = '/profit',
+      expenses = '/expenses',
+      productImport = '/products/import',
+      barcodeLabels = '/barcode/labels';
   static const String splash = '/splash';
   static const String login = '/login';
   static const String changePin = '/auth/change-pin';
@@ -51,6 +59,23 @@ class AppRoutes {
 class AppRouter {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case AppRoutes.profit:
+        return MaterialPageRoute<void>(
+            settings: settings, builder: (_) => const ProfitScreen());
+      case AppRoutes.expenses:
+        return MaterialPageRoute<void>(
+            settings: settings, builder: (_) => const ExpensesScreen());
+      case AppRoutes.productImport:
+        return MaterialPageRoute<void>(
+            settings: settings, builder: (_) => const ProductImportScreen());
+      case AppRoutes.barcodeLabels:
+        return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => BarcodeLabelsScreen(
+                productUuid: settings.arguments is String
+                    ? settings.arguments as String
+                    : null));
+
       case AppRoutes.login:
         return MaterialPageRoute<void>(
           settings: settings,
@@ -103,7 +128,9 @@ class AppRouter {
       case AppRoutes.sales:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const SalesScreen(),
+          // Standalone route: the screen assumes the shell provides the
+          // Material/Scaffold it needs for its filter controls.
+          builder: (_) => const Scaffold(body: SalesScreen()),
         );
       case AppRoutes.saleDetail:
         final saleUuid =
@@ -163,7 +190,7 @@ class AppRouter {
       case AppRoutes.more:
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => const MoreScreen(),
+          builder: (_) => const Scaffold(body: MoreScreen()),
         );
       case AppRoutes.settings:
         return MaterialPageRoute<void>(
@@ -224,7 +251,14 @@ class AppNavigator {
       pushNamed<T>(context, AppRoutes.scan);
 
   static Future<T?> toCheckout<T>(BuildContext context) =>
-      pushNamed<T>(context, AppRoutes.checkout);
+      showModalBottomSheet<T>(
+          context: context,
+          isScrollControlled: true,
+          isDismissible: false,
+          enableDrag: false,
+          useSafeArea: true,
+          builder: (_) => const FractionallySizedBox(
+              heightFactor: 0.95, child: CheckoutScreen()));
 
   static Future<T?> toReceipt<T>(BuildContext context, {String? saleUuid}) =>
       pushNamed<T>(context, AppRoutes.receipt, arguments: saleUuid);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/result.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../data/category_repository.dart';
 import '../domain/category.dart';
@@ -42,11 +43,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : null,
-      ),
+    showAppSnack(
+      context,
+      message,
+      kind: isError ? AppSnackKind.error : AppSnackKind.info,
     );
   }
 

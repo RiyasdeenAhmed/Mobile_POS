@@ -37,6 +37,11 @@ class SaleItem {
 
   DateTime? get createdDateTime => tryParseIso(createdAt);
 
+  /// Whole quantities render as integers ("2 ×"), fractional as decimals.
+  String get quantityText => quantity == quantity.roundToDouble()
+      ? quantity.round().toString()
+      : quantity.toString();
+
   SaleItem copyWith({int? id}) {
     return SaleItem(
       id: id ?? this.id,

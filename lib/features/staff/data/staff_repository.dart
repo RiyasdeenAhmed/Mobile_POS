@@ -114,6 +114,7 @@ class StaffRepository {
       'staff_users',
       {
         'password_hash': hash,
+        'pin_length': newPin.length,
         'must_change_pin': 0,
         'updated_at': now,
       },
@@ -123,9 +124,19 @@ class StaffRepository {
 
     return success(user.copyWith(
       passwordHash: hash,
+      pinLength: newPin.length,
       mustChangePin: false,
       updatedAt: now,
     ));
+  }
+
+  Future<int?> pinLengthForUsername(String username) async {
+    final user = await findByUsername(username.trim());
+    if (user == null || !user.isActive || user.isArchived) return null;
+    final length = user.pinLength;
+    return length != null && length >= minPinLength && length <= maxPinLength
+        ? length
+        : null;
   }
 
   Future<AppResult<StaffUser>> create({

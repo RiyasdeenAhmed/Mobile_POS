@@ -1,7 +1,9 @@
+import 'package:qubexcore_pos/core/database/settings_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:qubexcore_pos/core/database/app_database.dart';
+import 'package:qubexcore_pos/core/widgets/app_snack.dart';
 import 'package:qubexcore_pos/features/categories/data/category_repository.dart';
 import 'package:qubexcore_pos/features/checkout/data/checkout_service.dart';
 import 'package:qubexcore_pos/features/checkout/presentation/checkout_screen.dart';
@@ -68,6 +70,7 @@ void main() {
             Provider<CategoryRepository>.value(value: categories),
             ChangeNotifierProvider<CartController>.value(value: cart),
             if (withCheckout) ...[
+              Provider<SettingsRepository>.value(value: SettingsRepository(db)),
               Provider<CustomerRepository>.value(value: customers),
               Provider<CheckoutService>.value(value: CheckoutService(db)),
               ChangeNotifierProvider<StaffSession>.value(value: StaffSession()),
@@ -85,9 +88,12 @@ void main() {
   /// does not sit queued behind it.
   Future<void> clearSnackbars(WidgetTester tester) async {
     // Finish the entrance animation (the auto-dismiss timer only starts
-    // when it completes), fire the timer, then run the dismissal.
+    // when it completes), fire the longest centralized duration, then run
+    // the dismissal.
     await tester.pump(const Duration(milliseconds: 350));
-    await tester.pump(const Duration(milliseconds: 1250));
+    await tester.pump(
+      AppSnackDurations.error + const Duration(milliseconds: 100),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -127,7 +133,7 @@ void main() {
     expect(find.text('Drinks'), findsOneWidget);
     expect(find.text('Cola'), findsOneWidget);
     expect(find.text('Chips'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'View Cart'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Pay'), findsOneWidget);
     expect(find.text('Checkout'), findsNothing);
 
     // Filter by category.
@@ -225,6 +231,54 @@ void main() {
         findsOneWidget);
   });
 
+  testWidgets('Checkout validates split allocation and cash tender',
+      (tester) async {
+    usePhoneSurface(tester);
+    await openDb(tester);
+    final product = await realAsync(
+        tester,
+        () async => (await products.create(
+                name: 'Tea', sellingPriceMinor: 1200, stockQuantity: 5))
+            .dataOrNull!);
+    cart.addItem(CartItem.fromProduct(product));
+    await pumpScreen(tester,
+        screen: const CheckoutScreen(), withCheckout: true);
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Split'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Split'));
+    await tester.pumpAndSettle();
+    Future<void> amount(String label, String value) async {
+      final field = find.widgetWithText(TextField, label);
+      await tester.scrollUntilVisible(field, 160,
+          scrollable: find.byType(Scrollable).first);
+      await tester.enterText(field, value);
+      await tester.pump();
+    }
+
+    await amount('Cash amount', '5.00');
+    await amount('QR amount', '7.00');
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Complete sale'))
+            .onPressed,
+        isNull);
+    await amount('Cash received', '10.00');
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Complete sale'))
+            .onPressed,
+        isNotNull);
+    await amount('Cash received', 'bad');
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Complete sale'))
+            .onPressed,
+        isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Checkout: walk-in is the default customer', (tester) async {
     usePhoneSurface(tester);
     await openDb(tester);
@@ -250,11 +304,15 @@ void main() {
       withCheckout: true,
     );
 
+    await tester.scrollUntilVisible(find.text('Walk-in customer'), 180,
+        scrollable: find.byType(Scrollable).first);
     expect(find.text('Walk-in customer'), findsOneWidget);
     expect(find.text('No customer account — cash sale'), findsOneWidget);
 
     // The customer card lives in a ListView: scroll it into view first.
-    await tester.ensureVisible(find.text('Walk-in customer'));
+    await tester
+        .ensureVisible(find.widgetWithText(ListTile, 'Walk-in customer'));
+    await tester.pumpAndSettle();
 
     // Open the picker: walk-in is offered alongside real customers.
     await tester.runAsync(() async {
@@ -274,6 +332,7 @@ void main() {
 
     // Selecting a real customer updates the tile.
     await tester.ensureVisible(find.byIcon(Icons.person_outline));
+    await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await tester.tap(find.byIcon(Icons.person_outline));
       await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -290,4 +349,60 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'Checkout credit picker only offers customers with credit enabled',
+    (tester) async {
+      usePhoneSurface(tester);
+      await openDb(tester);
+
+      final product = (await realAsync(
+        tester,
+        () async =>
+            (await products.create(name: 'Cake', stockQuantity: 4)).dataOrNull!,
+      ));
+      cart.addItem(CartItem.fromProduct(product));
+      await realAsync(tester, () async {
+        await customers.create(name: 'Credit Enabled', creditLimitMinor: 50000);
+        await customers.create(name: 'No Credit Here');
+        await customers.create(
+          name: 'Switched Off',
+          creditLimitMinor: 20000,
+          creditEnabled: false,
+        );
+      });
+
+      await pumpScreen(
+        tester,
+        screen: const CheckoutScreen(),
+        withCheckout: true,
+      );
+
+      // Switch to the credit method. The follow-up customer preload is a DB
+      // read, so it needs a real window before the spinner can settle.
+      await tester.ensureVisible(find.text('Customer credit'));
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Customer credit'));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      });
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Walk-in customer'));
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Walk-in customer'));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text('Credit Enabled'), findsOneWidget);
+      expect(find.text('No Credit Here'), findsNothing);
+      expect(find.text('Switched Off'), findsNothing);
+
+      await tester.tap(find.text('Walk-in customer').last);
+      await tester.pumpAndSettle();
+      await realAsync(tester, customers.list);
+      await tester.pumpAndSettle();
+      expect(find.text('Walk-in customer'), findsOneWidget);
+    },
+  );
 }

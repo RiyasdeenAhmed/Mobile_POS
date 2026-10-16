@@ -125,7 +125,7 @@ void main() {
     expect(find.text('Camera permission denied'), findsOneWidget);
     expect(find.text('Scanner ready'), findsNothing);
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'Add'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Add'), findsOneWidget);
   });
 
   testWidgets('manual barcode entry adds the product without the camera',
@@ -136,13 +136,15 @@ void main() {
 
     await tester.enterText(find.byType(TextField), '777123');
     await realAsync(tester, () async {
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.tap(find.widgetWithText(TextButton, 'Add'));
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pumpAndSettle();
 
     expect(find.text('Added Cola'), findsOneWidget);
     expect(cart.itemCount, 1);
+    await tester.scrollUntilVisible(find.byType(TextField), 160,
+        scrollable: find.byType(Scrollable).first);
     expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
         isEmpty);
   });

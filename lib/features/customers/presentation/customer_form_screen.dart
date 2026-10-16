@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/money_text.dart';
 import '../../../core/utils/result.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../data/customer_repository.dart';
 import '../domain/customer.dart';
 
@@ -23,6 +24,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _addressController = TextEditingController();
   final _creditLimitController = TextEditingController();
   Customer? _customer;
+  bool _creditEnabled = false;
   bool _loading = false;
   bool _saving = false;
 
@@ -52,6 +54,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       _phoneController.text = customer.phone ?? '';
       _emailController.text = customer.email ?? '';
       _addressController.text = customer.address ?? '';
+      _creditEnabled = customer.creditEnabled;
       _creditLimitController.text = _majorString(customer.creditLimitMinor);
     });
   }
@@ -83,14 +86,11 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   }
 
   Future<void> _submit() async {
+    // Field validators (including the inline credit-limit error) run first;
+    // critical validation errors stay inline rather than flashing a SnackBar.
     if (!_formKey.currentState!.validate()) return;
-    final creditLimitMinor = _parseCreditLimit(_creditLimitController.text);
-    if (creditLimitMinor == null || creditLimitMinor < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credit limit cannot be negative')),
-      );
-      return;
-    }
+    final creditLimitMinor =
+        _parseCreditLimit(_creditLimitController.text) ?? 0;
     setState(() => _saving = true);
     final repository = context.read<CustomerRepository>();
     final AppResult<Customer> result;
@@ -107,6 +107,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           email: _emailController.text,
           address: _addressController.text,
           creditLimitMinor: creditLimitMinor,
+          creditEnabled: _creditEnabled,
         ),
       );
     } else {
@@ -116,25 +117,21 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         email: _emailController.text,
         address: _addressController.text,
         creditLimitMinor: creditLimitMinor,
+        creditEnabled: _creditEnabled,
       );
     }
     if (!mounted) return;
     setState(() => _saving = false);
     result.when(
       success: (Customer customer) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isEdit
-                ? 'Updated ${customer.name}'
-                : 'Added ${customer.name}'),
-          ),
+        showAppSnack(
+          context,
+          _isEdit ? 'Updated ${customer.name}' : 'Added ${customer.name}',
         );
         Navigator.of(context).pop(true);
       },
       failure: (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(failure.message)),
-        );
+        showAppSnack(context, failure.message, kind: AppSnackKind.error);
       },
     );
   }
@@ -202,7 +199,24 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                 final parsed = _parseCreditLimit(value ?? '');
                 if (parsed == null) return 'Invalid amount';
                 if (parsed < 0) return 'Credit limit cannot be negative';
+                if (_creditEnabled && parsed <= 0) {
+                  return 'Enter a limit or turn off Allow credit';
+                }
                 return null;
+              },
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Allow credit'),
+              subtitle: const Text(
+                'This customer can pay by credit at checkout',
+              ),
+              value: _creditEnabled,
+              onChanged: (value) {
+                setState(() => _creditEnabled = value);
+                // Re-run validators so a missing limit shows immediately
+                // after enabling credit.
+                _formKey.currentState?.validate();
               },
             ),
             const SizedBox(height: 24),

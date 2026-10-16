@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../app/routes.dart';
 import '../../../core/theme/money_text.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/stock_status.dart';
 import '../../products/data/product_repository.dart';
 import '../../products/domain/product.dart';
 import '../data/stock_movement_repository.dart';
@@ -58,21 +59,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
       value == value.truncateToDouble() ? '${value.round()}' : '$value';
 
   Widget _productTile(Product product, {required bool showReorder}) {
-    final out = product.stockQuantity <= 0;
-    final low =
-        product.trackStock && product.stockQuantity <= product.reorderLevel;
-    final color = out
-        ? const Color(0xFFB00020)
-        : low
-            ? const Color(0xFFB86E00)
-            : const Color(0xFF1B7F37);
-    final status = !product.trackStock
-        ? 'Not tracked'
-        : out
-            ? 'Out of stock'
-            : low
-                ? 'Low stock'
-                : 'In stock';
+    final status = resolveStockStatus(
+      trackStock: product.trackStock,
+      stock: product.stockQuantity,
+      reorderLevel: product.reorderLevel,
+    );
+    final color = status.readableColor(context);
 
     return ListTile(
       leading: CircleAvatar(
@@ -88,9 +80,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           'Stock ${_formatQuantity(product.stockQuantity)}',
           if (showReorder)
             'Reorder at ${_formatQuantity(product.reorderLevel)}',
-          status,
         ].join(' · '),
-        style: TextStyle(color: color),
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -103,6 +93,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 .titleSmall
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 4),
+          StockStatusBadge(status: status, compact: true),
         ],
       ),
       onTap: () => _openAdjust(product),

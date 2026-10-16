@@ -3,29 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/money_text.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/stock_status.dart';
 import '../../categories/data/category_repository.dart';
 import '../../categories/domain/category.dart';
 import '../data/product_repository.dart';
 import '../domain/product.dart';
-
-enum _StockStatus { notTracked, out, low, inStock }
-
-extension _StockStatusInfo on _StockStatus {
-  String get label => switch (this) {
-        _StockStatus.notTracked => 'Not tracked',
-        _StockStatus.out => 'Out of stock',
-        _StockStatus.low => 'Low stock',
-        _StockStatus.inStock => 'In stock',
-      };
-
-  Color get color => switch (this) {
-        _StockStatus.notTracked => const Color(0xFF646464),
-        _StockStatus.out => const Color(0xFFB00020),
-        _StockStatus.low => const Color(0xFFB86E00),
-        _StockStatus.inStock => const Color(0xFF1B7F37),
-      };
-}
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -80,21 +64,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Future<void> _openForm({Product? product}) async {
-    final saved = await AppNavigator.toProductForm<bool>(
+    // Push untyped: onGenerateRoute builds MaterialPageRoute<dynamic> and a
+    // typed pushNamed<bool> would fail the Route<T?> cast at runtime.
+    final saved = await AppNavigator.toProductForm(
       context,
       productUuid: product?.uuid,
     );
     if (saved == true) await _load();
   }
 
-  _StockStatus _statusOf(Product product) {
-    if (!product.trackStock) return _StockStatus.notTracked;
-    if (product.stockQuantity <= 0) return _StockStatus.out;
-    if (product.reorderLevel > 0 &&
-        product.stockQuantity <= product.reorderLevel) {
-      return _StockStatus.low;
-    }
-    return _StockStatus.inStock;
+  StockStatus _statusOf(Product product) {
+    return resolveStockStatus(
+      trackStock: product.trackStock,
+      stock: product.stockQuantity,
+      reorderLevel: product.reorderLevel,
+    );
   }
 
   List<Product> get _visible {
@@ -105,8 +89,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
       final status = _statusOf(product);
       if (_lowStockOnly &&
-          status != _StockStatus.low &&
-          status != _StockStatus.out) {
+          status != StockStatus.low &&
+          status != StockStatus.out) {
         return false;
       }
       if (query.isEmpty) return true;
@@ -120,9 +104,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final confirmed = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Archive ${product.name}?'),
+        title: Text('Delete ${product.name}?'),
         content: const Text(
-            'Archived products are hidden from sales and stay in past receipts.'),
+            'This removes the product from the catalog and new sales. Past receipts and stock records are preserved.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -130,7 +114,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Archive'),
+            child: const Text('Delete product'),
           ),
         ],
       ),
@@ -140,16 +124,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
         await context.read<ProductRepository>().archive(product.uuid);
     if (!mounted) return;
     if (result.isFailure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text(result.failureOrNull?.message ?? 'Unable to archive')),
+      showAppSnack(
+        context,
+        result.failureOrNull?.message ?? 'Unable to delete product',
+        kind: AppSnackKind.error,
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Archived ${product.name}')),
-    );
+    showAppSnack(context, 'Deleted ${product.name}');
     await _load();
   }
 
@@ -288,16 +270,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   itemBuilder: (context, index) {
                                     final product = visible[index];
                                     final status = _statusOf(product);
+                                    final statusColor = status.readableColor(
+                                      context,
+                                    );
                                     return ListTile(
                                       leading: CircleAvatar(
-                                        backgroundColor: status.color
-                                            .withValues(alpha: 0.12),
+                                        backgroundColor:
+                                            statusColor.withValues(alpha: 0.12),
                                         child: Text(
                                           product.name.isEmpty
                                               ? '?'
                                               : product.name[0].toUpperCase(),
                                           style: TextStyle(
-                                              color: status.color,
+                                              color: statusColor,
                                               fontWeight: FontWeight.bold),
                                         ),
                                       ),
@@ -316,20 +301,32 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                           ),
-                                          Text(
-                                            [
-                                              if (product.sku != null &&
-                                                  product.sku!.isNotEmpty)
-                                                'SKU ${product.sku}',
-                                              if (product.trackStock)
-                                                'Stock ${product.stockQuantity.toStringAsFixed(0)}',
-                                              status.label,
-                                            ].join(' · '),
-                                            style:
-                                                TextStyle(color: status.color),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  [
+                                                    if (product.sku != null &&
+                                                        product.sku!.isNotEmpty)
+                                                      'SKU ${product.sku}',
+                                                    if (product.trackStock)
+                                                      'Stock ${product.stockQuantity.toStringAsFixed(0)}',
+                                                  ].join(' · '),
+                                                  style: TextStyle(
+                                                    color: Theme.of(context)
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.color,
+                                                  ),
+                                                ),
+                                              ),
+                                              StockStatusBadge(status: status),
+                                            ],
                                           ),
                                         ],
                                       ),
+                                      onTap: () => _openForm(product: product),
                                       trailing: PopupMenuButton<String>(
                                         tooltip: 'Product actions',
                                         onSelected: (value) async {
@@ -341,11 +338,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                               productUuid: product.uuid,
                                             );
                                             if (mounted) await _load();
+                                          } else if (value == 'labels') {
+                                            await AppNavigator.pushNamed(
+                                                context,
+                                                AppRoutes.barcodeLabels,
+                                                arguments: product.uuid);
+                                            if (mounted) await _load();
                                           } else if (value == 'archive') {
                                             await _archive(product);
                                           }
                                         },
                                         itemBuilder: (_) => const [
+                                          PopupMenuItem<String>(
+                                              value: 'labels',
+                                              child: Text('Barcode Labels')),
                                           PopupMenuItem<String>(
                                               value: 'edit',
                                               child: Text('Edit')),
@@ -354,7 +360,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                               child: Text('Adjust stock')),
                                           PopupMenuItem<String>(
                                               value: 'archive',
-                                              child: Text('Archive')),
+                                              child: Row(children: [
+                                                Icon(Icons.delete_outline),
+                                                SizedBox(width: 8),
+                                                Text('Delete product')
+                                              ])),
                                         ],
                                       ),
                                     );

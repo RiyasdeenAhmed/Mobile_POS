@@ -130,6 +130,7 @@ class ProductRepository {
   Future<List<Product>> search(
     String query, {
     bool includeArchived = false,
+    int? limit,
   }) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
@@ -144,6 +145,7 @@ class ProductRepository {
       where: base,
       whereArgs: [like, like, like],
       orderBy: 'name COLLATE NOCASE ASC',
+      limit: limit,
     );
     return rows.map(Product.fromMap).toList();
   }
@@ -203,23 +205,28 @@ class ProductRepository {
   }
 
   Future<AppResult<Product>> archive(String uuid) async {
-    final product = await findByUuid(uuid);
-    if (product == null) {
-      return failure('Product not found', code: 'not_found');
+    try {
+      final product = await findByUuid(uuid);
+      if (product == null) {
+        return failure('Product not found', code: 'not_found');
+      }
+      final archived = product.copyWith(
+        isArchived: true,
+        updatedAt: utcNowIso(),
+      );
+      await database.db.update(
+        'products',
+        {
+          'is_archived': 1,
+          'updated_at': archived.updatedAt,
+        },
+        where: 'uuid = ?',
+        whereArgs: [uuid],
+      );
+      return success(archived);
+    } catch (error) {
+      return failure(describeDatabaseError(error, 'Unable to delete product'),
+          code: 'database');
     }
-    final archived = product.copyWith(
-      isArchived: true,
-      updatedAt: utcNowIso(),
-    );
-    await database.db.update(
-      'products',
-      {
-        'is_archived': 1,
-        'updated_at': archived.updatedAt,
-      },
-      where: 'uuid = ?',
-      whereArgs: [uuid],
-    );
-    return success(archived);
   }
 }

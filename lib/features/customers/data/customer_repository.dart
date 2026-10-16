@@ -17,6 +17,7 @@ class CustomerRepository {
     String? email,
     String? address,
     int creditLimitMinor = 0,
+    bool? creditEnabled,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -34,6 +35,9 @@ class CustomerRepository {
       email: _normalizeOptional(email),
       address: _normalizeOptional(address),
       creditLimitMinor: creditLimitMinor,
+      // Setting a limit implies the facility unless the caller says
+      // otherwise, matching the migration backfill rule.
+      creditEnabled: creditEnabled ?? creditLimitMinor > 0,
       createdAt: now,
       updatedAt: now,
     );
@@ -104,6 +108,21 @@ class CustomerRepository {
       'customers',
       where: where,
       orderBy: 'name COLLATE NOCASE ASC',
+    );
+    return rows.map(Customer.fromMap).toList();
+  }
+
+  /// Name/phone lookup for the dashboard search, newest-name ordered.
+  Future<List<Customer>> search(String query, {int? limit}) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const <Customer>[];
+    final like = '%$trimmed%';
+    final rows = await database.db.query(
+      'customers',
+      where: 'is_archived = 0 AND (name LIKE ? OR phone LIKE ?)',
+      whereArgs: [like, like],
+      orderBy: 'name COLLATE NOCASE ASC',
+      limit: limit,
     );
     return rows.map(Customer.fromMap).toList();
   }

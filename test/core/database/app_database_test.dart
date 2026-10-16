@@ -13,9 +13,9 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  test('schema version is 4 and core tables exist', () async {
+  test('schema version is 6 and core tables exist', () async {
     final db = await AppDatabase.open(path: inMemoryDatabasePath);
-    expect(AppDatabase.schemaVersion, 4);
+    expect(AppDatabase.schemaVersion, 6);
 
     final rows = await db.db.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table'",
@@ -33,6 +33,7 @@ void main() {
       'payments',
       'stock_movements',
       'customer_ledger',
+      'expenses',
     };
     for (final table in expected) {
       expect(names.contains(table), isTrue, reason: 'missing $table');
@@ -84,7 +85,8 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  test('existing v1 install upgrades through v2, v3 and v4 on open', () async {
+  test('existing v1 install upgrades through v2, v3, v4 and v5 on open',
+      () async {
     final tempDir = await Directory.systemTemp.createTemp('qubex_db_upgrade');
     final path = p.join(tempDir.path, 'qubexcore.db');
     final v1 = await databaseFactory.openDatabase(
@@ -104,7 +106,7 @@ void main() {
     final upgraded = await AppDatabase.open(path: path);
     expect(
       await MigrationRunner.appliedVersions(upgraded.db),
-      {1, 2, 3, 4},
+      {1, 2, 3, 4, 5, 6},
     );
     await upgraded.close();
     await tempDir.delete(recursive: true);

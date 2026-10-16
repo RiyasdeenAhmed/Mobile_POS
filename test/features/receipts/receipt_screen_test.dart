@@ -114,7 +114,7 @@ void main() {
     expect(find.text('Come again soon'), findsOneWidget);
     expect(find.textContaining('INV-'), findsOneWidget);
     expect(find.text('Method: CASH'), findsOneWidget);
-    expect(find.text('1 × Espresso'), findsOneWidget);
+    expect(find.textContaining('1 × Espresso'), findsOneWidget);
   });
 
   testWidgets('manual reprint sends the receipt to the printer',
@@ -153,7 +153,7 @@ void main() {
     });
     await tester.pumpAndSettle();
 
-    expect(find.text('Printing failed'), findsOneWidget);
+    expect(find.text('Printer is unavailable'), findsOneWidget);
     expect(printer.jobs, isEmpty);
     expect(await realAsync(tester, sales.count), 1);
   });

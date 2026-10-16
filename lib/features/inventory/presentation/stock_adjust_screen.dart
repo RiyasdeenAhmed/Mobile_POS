@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/money_text.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../products/data/product_repository.dart';
 import '../../products/domain/product.dart';
 import '../../staff/application/staff_session.dart';
@@ -93,17 +94,17 @@ class _StockAdjustScreenState extends State<StockAdjustScreen> {
     setState(() => _saving = false);
 
     if (result.isFailure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.failureOrNull!.message)),
+      showAppSnack(
+        context,
+        result.failureOrNull!.message,
+        kind: AppSnackKind.error,
       );
       return;
     }
     _quantityController.clear();
     _noteController.clear();
     _formKey.currentState?.reset();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Stock adjusted')),
-    );
+    showAppSnack(context, 'Stock adjusted');
     await _load();
   }
 

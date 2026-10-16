@@ -70,6 +70,35 @@ void main() {
     return (row['stock_quantity'] as num).toDouble();
   }
 
+  test('split return requires an explicit paid method before writing',
+      () async {
+    final product = (await products.create(
+            name: 'Tea', sellingPriceMinor: 1200, stockQuantity: 10))
+        .dataOrNull!;
+    final sale = (await checkout.completeSale(CheckoutRequest(
+            items: [CartItem.fromProduct(product)],
+            paymentMethod: PaymentMethods.split,
+            allocations: const [
+              PaymentAllocation(
+                  method: 'cash', amountMinor: 500, receivedMinor: 500),
+              PaymentAllocation(method: 'qr', amountMinor: 700)
+            ])))
+        .dataOrNull!;
+    final lines = [
+      ReturnLineInput(saleItemId: sale.items.single.id!, quantity: 1)
+    ];
+    final blocked =
+        await returns.createReturn(saleId: sale.sale.id!, lines: lines);
+    expect(blocked.failureOrNull?.code, 'refund_method_required');
+    expect(await db.db.query('returns'), isEmpty);
+    expect(await stockOf(product.id!), 9);
+    final result = await returns.createReturn(
+        saleId: sale.sale.id!, lines: lines, refundMethod: 'cash');
+    expect(result.isSuccess, isTrue);
+    expect(result.dataOrNull!.refundMethod, 'cash');
+    expect(await stockOf(product.id!), 10);
+  });
+
   test('return restores stock, writes movement rows, and records refund',
       () async {
     final (outcome, productId) = await saleOf();

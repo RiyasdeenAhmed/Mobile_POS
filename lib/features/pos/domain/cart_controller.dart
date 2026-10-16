@@ -1,3 +1,4 @@
+import '../../../core/utils/tax_calculator.dart';
 import 'package:flutter/foundation.dart';
 
 import 'cart_item.dart';
@@ -36,6 +37,19 @@ enum CartChangeResult {
 class CartController extends ChangeNotifier {
   final List<CartItem> _items = <CartItem>[];
   String _note = '';
+  int _taxRateBps = 0;
+  bool _disposed = false;
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void setTaxRate(int rate) {
+    if (_disposed || _taxRateBps == rate) return;
+    _taxRateBps = rate;
+    notifyListeners();
+  }
 
   List<CartItem> get items => List<CartItem>.unmodifiable(_items);
 
@@ -62,7 +76,7 @@ class CartController extends ChangeNotifier {
       discount += item.discountMinor;
       count += item.quantity.round();
     }
-    const tax = 0;
+    final tax = TaxCalculator.taxMinor(subtotal - discount, _taxRateBps);
     return CartTotals(
       subtotalMinor: subtotal,
       discountMinor: discount,

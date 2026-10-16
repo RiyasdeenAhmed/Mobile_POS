@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:qubexcore_pos/app/theme_controller.dart';
 import 'package:qubexcore_pos/core/database/app_database.dart';
 import 'package:qubexcore_pos/core/database/settings_repository.dart';
 import 'package:qubexcore_pos/core/theme/money_text.dart';
@@ -26,18 +27,23 @@ void main() {
 
   late AppDatabase db;
   late SettingsRepository settings;
+  late ThemeController themeController;
 
   Future<void> openDb(WidgetTester tester) async {
     await realAsync(tester, () async {
       db = await AppDatabase.open(path: inMemoryDatabasePath);
       settings = SettingsRepository(db);
     });
+    themeController = ThemeController(settings);
     addTearDown(() => tester.runAsync(db.close));
   }
 
   Widget app() {
     return MultiProvider(
-      providers: [Provider<SettingsRepository>.value(value: settings)],
+      providers: [
+        Provider<SettingsRepository>.value(value: settings),
+        ChangeNotifierProvider<ThemeController>.value(value: themeController),
+      ],
       child: const MaterialApp(home: SettingsScreen()),
     );
   }
@@ -124,4 +130,42 @@ void main() {
     expect(negative, '1');
     expect(autoPrint, '1');
   });
+
+  testWidgets(
+    'appearance section switches theme mode immediately and persists it',
+    (tester) async {
+      await openDb(tester);
+      await pumpLoaded(tester);
+
+      // Default follows the device setting.
+      expect(themeController.mode, ThemeMode.system);
+
+      await tester.scrollUntilVisible(
+        find.text('Dark'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Dark'));
+      await tester.pump();
+      expect(themeController.mode, ThemeMode.dark);
+
+      final storedDark =
+          await realAsync(tester, () => settings.getString('theme_mode'));
+      expect(storedDark, 'dark');
+
+      await tester.scrollUntilVisible(
+        find.text('System'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('System'));
+      await tester.pump();
+      expect(themeController.mode, ThemeMode.system);
+
+      final storedSystem =
+          await realAsync(tester, () => settings.getString('theme_mode'));
+      expect(storedSystem, 'system');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

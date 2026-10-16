@@ -230,6 +230,45 @@ void main() {
     expect(refreshed.creditLimitMinor, 50000);
   });
 
+  testWidgets('customer form requires a limit when credit is enabled',
+      (tester) async {
+    await openDb(tester);
+
+    await pumpApp(tester, const CustomerFormScreen());
+    expect(find.text('New customer'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Name'),
+      'Fresh Mart',
+    );
+
+    // Enabling credit with an empty limit shows an inline error at once.
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Enter a limit or turn off Allow credit'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Credit limit (optional)'),
+      '250.00',
+    );
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Save customer'));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    });
+    await tester.pumpAndSettle();
+
+    final created = await realAsync(tester, () async {
+      final rows = await db.db.query('customers');
+      return rows.single;
+    });
+    expect(created['name'], 'Fresh Mart');
+    expect(created['credit_limit_minor'], 25000);
+    expect(created['credit_enabled'], 1);
+  });
+
   testWidgets('customers screen archives a customer', (tester) async {
     await openDb(tester);
     final customer = await createCustomer(tester, 'Acme Cafe');

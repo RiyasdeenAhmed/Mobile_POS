@@ -55,6 +55,9 @@ class SettingsRepository {
     }
     const defaults = <String, String>{
       'store_name': 'QubeXCore Store',
+      'branch_name': '',
+      'hotline': '',
+      'terminal_number': '',
       'currency_symbol': 'Rs',
       'currency_code': 'LKR',
       'invoice_sequence': '0',
@@ -63,6 +66,16 @@ class SettingsRepository {
       'tax_rate_bps': '0',
       'allow_negative_stock': '0',
       'auto_print_receipt': '0',
+      'printer_address': '',
+      'business_logo_path': '',
+      'printer_protocol': 'tspl',
+      'printer_width': '42',
+      'printer_last_error': '',
+      'printer_offset_dots': '0',
+      'printer_content_width_dots': '608',
+      'printer_logo_width_dots': '360',
+      'printer_font_scale': '1',
+      'theme_mode': 'system',
     };
     for (final entry in defaults.entries) {
       final existing = await getString(entry.key);
@@ -77,6 +90,9 @@ class SettingsRepository {
       'store_name',
       'store_address',
       'store_phone',
+      'branch_name',
+      'hotline',
+      'terminal_number',
       'currency_symbol',
       'currency_code',
       'invoice_sequence',
@@ -86,8 +102,19 @@ class SettingsRepository {
       'allow_negative_stock',
       'printer_enabled',
       'printer_name',
+      'printer_address',
       'printer_width',
       'auto_print_receipt',
+      'tap_to_pay_enabled',
+      'session_timeout_minutes',
+      'business_logo_path',
+      'printer_protocol',
+      'printer_last_error',
+      'printer_offset_dots',
+      'printer_content_width_dots',
+      'printer_logo_width_dots',
+      'printer_font_scale',
+      'business_logo_path',
     ];
     final result = <String, String>{};
     for (final key in keys) {

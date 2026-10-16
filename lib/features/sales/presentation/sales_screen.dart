@@ -21,10 +21,16 @@ class _SalesScreenState extends State<SalesScreen> {
   static const String _range7d = '7d';
   static const String _rangeAll = 'all';
 
+  /// Caps filtered history so a busy store cannot load an unbounded list;
+  /// "All time" opts out deliberately.
+  static const int _filteredLimit = 500;
+
   List<Sale> _sales = <Sale>[];
   bool _loading = true;
   String _range = _rangeToday;
   String? _method;
+  String? _error;
+  int _requestId = 0;
 
   @override
   void initState() {
@@ -34,39 +40,55 @@ class _SalesScreenState extends State<SalesScreen> {
     });
   }
 
+  /// Boundaries use the cashier's local calendar day (Today / Yesterday),
+  /// converted to UTC for comparison against the stored UTC `sale_at`.
   ({DateTime? from, DateTime? to}) _rangeWindow(String range) {
-    final now = DateTime.now().toUtc();
-    final todayStart = DateTime.utc(now.year, now.month, now.day);
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final yesterdayStart = DateTime(now.year, now.month, now.day - 1);
+    final weekStart = DateTime(now.year, now.month, now.day - 7);
+    final tomorrowStart = DateTime(now.year, now.month, now.day + 1);
     return switch (range) {
-      _rangeYesterday => (
-          from: todayStart.subtract(const Duration(days: 1)),
-          to: todayStart,
-        ),
-      _range7d => (
-          from: now.subtract(const Duration(days: 7)),
-          to: todayStart.add(const Duration(days: 1)),
-        ),
+      _rangeYesterday => (from: yesterdayStart, to: todayStart),
+      _range7d => (from: weekStart, to: tomorrowStart),
       _rangeAll => (from: null, to: null),
-      _ => (
-          from: todayStart,
-          to: todayStart.add(const Duration(days: 1)),
-        ),
+      _ => (from: todayStart, to: tomorrowStart),
     };
   }
 
   Future<void> _load() async {
-    final repository = context.read<SaleRepository>();
-    final window = _rangeWindow(_range);
-    final sales = await repository.list(
-      from: window.from,
-      to: window.to,
-      paymentMethod: _method,
-    );
-    if (!mounted) return;
+    final requestId = ++_requestId;
+    try {
+      final repository = context.read<SaleRepository>();
+      final window = _rangeWindow(_range);
+      final sales = await repository.list(
+        from: window.from,
+        to: window.to,
+        paymentMethod: _method,
+        limit: _range == _rangeAll ? null : _filteredLimit,
+      );
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _sales = sales;
+        _loading = false;
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _sales = <Sale>[];
+        _loading = false;
+        _error = 'Sales could not be loaded';
+      });
+    }
+  }
+
+  void _retry() {
     setState(() {
-      _sales = sales;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+    _load();
   }
 
   void _setRange(String range) {
@@ -74,6 +96,7 @@ class _SalesScreenState extends State<SalesScreen> {
     setState(() {
       _range = range;
       _loading = true;
+      _error = null;
     });
     _load();
   }
@@ -83,6 +106,7 @@ class _SalesScreenState extends State<SalesScreen> {
     setState(() {
       _method = method;
       _loading = true;
+      _error = null;
     });
     _load();
   }
@@ -123,7 +147,11 @@ class _SalesScreenState extends State<SalesScreen> {
                 MapEntry(null, 'All'),
                 MapEntry(PaymentMethods.cash, 'Cash'),
                 MapEntry(PaymentMethods.card, 'Card'),
-                MapEntry(PaymentMethods.credit, 'Credit'),
+                MapEntry(PaymentMethods.credit, 'Customer credit'),
+                MapEntry(PaymentMethods.creditCard, 'Credit card'),
+                MapEntry(PaymentMethods.debitCard, 'Debit card'),
+                MapEntry(PaymentMethods.qr, 'QR'),
+                MapEntry(PaymentMethods.split, 'Split'),
               ])
                 FilterChip(
                   label: Text(entry.value),
@@ -137,7 +165,24 @@ class _SalesScreenState extends State<SalesScreen> {
     );
   }
 
+  Widget _wrapRefresh(Widget child) {
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: child,
+    );
+  }
+
   Widget _emptyState() {
+    return _wrapRefresh(
+      ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [_emptyContent()],
+      ),
+    );
+  }
+
+  Widget _emptyContent() {
     return EmptyState(
       icon: Icons.receipt_long_outlined,
       title: 'No sales yet',
@@ -149,51 +194,83 @@ class _SalesScreenState extends State<SalesScreen> {
     );
   }
 
+  Widget _errorState() {
+    return _wrapRefresh(
+      ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          EmptyState(
+            icon: Icons.error_outline,
+            title: 'Sales could not be loaded',
+            message: 'Check the device storage and try again.',
+            action: ElevatedButton(
+              onPressed: _retry,
+              child: const Text('Try again'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _salesList() {
+    return _wrapRefresh(
+      ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+        itemCount: _sales.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final sale = _sales[index];
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(sale.invoiceNumber),
+            subtitle: Text(
+              [
+                sale.paymentMethod.toUpperCase(),
+                _formatWhen(sale.saleAt),
+              ].join(' · '),
+            ),
+            trailing: MoneyText(amountMinor: sale.totalMinor),
+            onTap: () => AppNavigator.toSaleDetail(
+              context,
+              saleUuid: sale.uuid,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  static String _formatWhen(String saleAt) {
+    final parsed = DateTime.tryParse(saleAt);
+    if (parsed == null) return saleAt;
+    final local = parsed.toLocal();
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
+  }
+
+  Widget _body() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return _errorState();
+    }
+    if (_sales.isEmpty) {
+      return _emptyState();
+    }
+    return _salesList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (_loading) {
-      return Column(
-        children: [
-          _filterHeader(theme),
-          const Expanded(child: Center(child: CircularProgressIndicator())),
-        ],
-      );
-    }
     return Column(
       children: [
         _filterHeader(theme),
-        Expanded(
-          child: _sales.isEmpty
-              ? ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [_emptyState()],
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    itemCount: _sales.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final sale = _sales[index];
-                      return ListTile(
-                        title: Text(sale.invoiceNumber),
-                        subtitle: Text(
-                          [
-                            sale.paymentMethod.toUpperCase(),
-                            sale.saleAt,
-                          ].join(' · '),
-                        ),
-                        trailing: MoneyText(amountMinor: sale.totalMinor),
-                        onTap: () => AppNavigator.toSaleDetail(
-                          context,
-                          saleUuid: sale.uuid,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-        ),
+        Expanded(child: _body()),
       ],
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app/app.dart';
+import 'app/theme_controller.dart';
 import 'core/database/app_database.dart';
 import 'core/database/settings_repository.dart';
 import 'core/theme/money_text.dart';
@@ -16,10 +17,14 @@ Future<void> main() async {
     await settings.ensureSeededDefaults();
     MoneyFormat.defaultSymbol =
         await settings.getStringOrDefault('currency_symbol', 'Rs');
+    final themeController = ThemeController(settings);
+    await themeController.load();
     await DevelopmentStaffSeeder.seed(database);
     await DevelopmentCatalogSeeder.seed(database);
     await DevelopmentCustomerSeeder.seed(database);
-    runApp(QubeXCoreApp(database: database));
+    runApp(
+      QubeXCoreApp(database: database, themeController: themeController),
+    );
   } catch (error) {
     runApp(DatabaseErrorApp(message: '$error'));
   }

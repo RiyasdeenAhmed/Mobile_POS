@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/money_text.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../data/customer_ledger_repository.dart';
 import '../data/customer_repository.dart';
@@ -133,8 +134,10 @@ class _CustomerAccountScreenState extends State<CustomerAccountScreen> {
     }
     if (amountMinor == null || amountMinor <= 0) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter an amount greater than zero')),
+      showAppSnack(
+        context,
+        'Enter an amount greater than zero',
+        kind: AppSnackKind.error,
       );
       return;
     }
@@ -148,19 +151,14 @@ class _CustomerAccountScreenState extends State<CustomerAccountScreen> {
     if (!mounted) return;
     result.when(
       success: (int newBalance) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Repayment recorded — balance ${MoneyFormat.format(newBalance)}',
-            ),
-          ),
+        showAppSnack(
+          context,
+          'Repayment recorded — balance ${MoneyFormat.format(newBalance)}',
         );
         _reload();
       },
       failure: (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(failure.message)),
-        );
+        showAppSnack(context, failure.message, kind: AppSnackKind.error);
       },
     );
   }

@@ -8,11 +8,15 @@ class StaffSession extends ChangeNotifier {
   StaffRepository? _repository;
 
   StaffUser? _current;
+  DateTime? _lastActivity;
+  Duration sessionTimeout = Duration.zero;
 
   StaffUser? get current => _current;
   bool get isSignedIn => _current != null;
   bool get mustChangePin => _current?.mustChangePin ?? false;
   bool get isAdmin => _current?.role == 'admin';
+  bool get isExpired => _current != null && sessionTimeout > Duration.zero &&
+      _lastActivity != null && DateTime.now().difference(_lastActivity!) >= sessionTimeout;
   String? get staffUuid => _current?.uuid;
   String? get displayName => _current?.displayName;
 
@@ -22,7 +26,24 @@ class StaffSession extends ChangeNotifier {
 
   void adopt(StaffUser user) {
     _current = user;
+    touch();
     notifyListeners();
+  }
+
+  void configureTimeout(Duration timeout) {
+    sessionTimeout = timeout;
+    if (isExpired) signOut();
+  }
+
+  void touch() => _lastActivity = DateTime.now();
+
+  bool ensureActive() {
+    if (isExpired) {
+      signOut();
+      return false;
+    }
+    touch();
+    return isSignedIn;
   }
 
   Future<AppResult<StaffUser>> signIn({
@@ -38,6 +59,7 @@ class StaffSession extends ChangeNotifier {
     final data = result.dataOrNull;
     if (data != null) {
       _current = data;
+      touch();
       notifyListeners();
     }
     return result;
@@ -69,6 +91,7 @@ class StaffSession extends ChangeNotifier {
   void signOut() {
     if (_current == null) return;
     _current = null;
+    _lastActivity = null;
     notifyListeners();
   }
 }

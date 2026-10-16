@@ -35,7 +35,8 @@ class ReturnService {
 
     final now = utcNowIso();
     try {
-      return await database.db.transaction<AppResult<SaleReturn>>((txn) async {
+      final result =
+          await database.db.transaction<AppResult<SaleReturn>>((txn) async {
         final saleRows = await txn.query(
           'sales',
           where: 'id = ?',
@@ -53,6 +54,12 @@ class ReturnService {
           );
         }
 
+        if (sale['payment_method'] == 'split' &&
+            !const {'cash', 'credit_card', 'debit_card', 'qr'}
+                .contains(refundMethod)) {
+          return failure('Choose a paid refund method for this split sale',
+              code: 'refund_method_required');
+        }
         final returnUuid = newBusinessId();
         final resolvedRefundMethod =
             (refundMethod != null && refundMethod.isNotEmpty)
@@ -234,6 +241,8 @@ class ReturnService {
           ),
         );
       });
+      if (result.isSuccess) database.financialChanged();
+      return result;
     } on DatabaseException catch (e) {
       return failure('Unable to record return: $e', code: 'database');
     }

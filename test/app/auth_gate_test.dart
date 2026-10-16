@@ -55,6 +55,9 @@ void main() {
         ),
       );
     });
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
     await tester.pump();
     await tester.pump();
   }
@@ -93,11 +96,75 @@ void main() {
 
     await pumpGate(tester, database);
 
-    expect(find.text('Sign in'), findsWidgets);
-    expect(find.text('Username'), findsOneWidget);
-    expect(find.text('PIN'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pin-submit')), findsOneWidget);
+    expect(find.text('Staff account'), findsOneWidget);
+    expect(find.text('Enter PIN'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
     expect(find.text('Enter demo mode'), findsNothing);
+  });
+
+  testWidgets('keypad caps PIN at eight digits and backspace removes one',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    late AppDatabase db;
+    await tester.runAsync(() async {
+      db = await openSeededDatabase();
+    });
+    addTearDown(() => tester.runAsync(db.close));
+    await pumpGate(tester, db);
+    for (var i = 0; i < 10; i++) {
+      await tester.tap(find.byKey(const ValueKey('pin-1')));
+      await tester.pump();
+    }
+    expect(find.text(List.filled(8, '●').join(' ')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('pin-backspace')));
+    await tester.pump();
+    expect(find.text(List.filled(7, '●').join(' ')), findsOneWidget);
+  });
+
+  testWidgets(
+      'staff selection excludes disabled users and clears PIN on switch',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    late AppDatabase db;
+    await tester.runAsync(() async {
+      db = await openSeededDatabase();
+      final original =
+          Map<String, Object?>.from((await db.db.query('staff_users')).single)
+            ..remove('id');
+      await db.db.insert('staff_users', {
+        ...original,
+        'uuid': 'cashier',
+        'username': 'cashier',
+        'display_name': 'Cashier Two'
+      });
+      await db.db.insert('staff_users', {
+        ...original,
+        'uuid': 'disabled',
+        'username': 'disabled',
+        'display_name': 'Disabled Staff',
+        'is_active': 0
+      });
+    });
+    addTearDown(() => tester.runAsync(db.close));
+    await pumpGate(tester, db);
+    await tester.tap(find.text('Staff account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Disabled Staff'), findsNothing);
+    await tester.tap(find.text('Store Admin').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pin-1')));
+    await tester.pump();
+    expect(find.text('●'), findsOneWidget);
+    await tester.tap(find.text('Store Admin'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cashier Two').last);
+    await tester.pumpAndSettle();
+    expect(find.text('○ ○ ○ ○'), findsOneWidget);
   });
 
   testWidgets('wrong pin shows an error and stays on login', (tester) async {
@@ -115,15 +182,18 @@ void main() {
 
     await pumpGate(tester, database);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
-    await tester.enterText(find.byType(TextFormField).at(1), '0000');
+    for (final digit in '0000'.split('')) {
+      await tester.tap(find.byKey(ValueKey('pin-$digit')));
+      await tester.pump();
+    }
     await tapAndSettle(
       tester,
-      find.widgetWithText(ElevatedButton, 'Sign in'),
+      find.byKey(const ValueKey('pin-submit')),
       until: () => find.text('Incorrect username or PIN').evaluate().isNotEmpty,
     );
 
     expect(find.text('Incorrect username or PIN'), findsOneWidget);
+    expect(find.text('○ ○ ○ ○'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });
 
@@ -143,11 +213,13 @@ void main() {
 
     await pumpGate(tester, database);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
-    await tester.enterText(find.byType(TextFormField).at(1), '1234');
+    for (final digit in '1234'.split('')) {
+      await tester.tap(find.byKey(ValueKey('pin-$digit')));
+      await tester.pump();
+    }
     await tapAndSettle(
       tester,
-      find.widgetWithText(ElevatedButton, 'Sign in'),
+      find.byKey(const ValueKey('pin-submit')),
       until: () => find.text('Change PIN').evaluate().isNotEmpty,
     );
 
@@ -187,11 +259,13 @@ void main() {
 
     await pumpGate(tester, database);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'admin');
-    await tester.enterText(find.byType(TextFormField).at(1), '1234');
+    for (final digit in '1234'.split('')) {
+      await tester.tap(find.byKey(ValueKey('pin-$digit')));
+      await tester.pump();
+    }
     await tapAndSettle(
       tester,
-      find.widgetWithText(ElevatedButton, 'Sign in'),
+      find.byKey(const ValueKey('pin-submit')),
       until: () => find.byType(NavigationBar).evaluate().isNotEmpty,
     );
 

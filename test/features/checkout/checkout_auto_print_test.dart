@@ -100,15 +100,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // Card payment submits without entering an amount.
-    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Card'));
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Card'));
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Credit card'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Credit card'));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(
-      find.widgetWithText(ElevatedButton, 'Complete sale'),
+      find.widgetWithText(FilledButton, 'Complete sale'),
     );
     await realAsync(tester, () async {
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Complete sale'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Complete sale'));
       // completeSale writes sale/items/payment/stock on the isolate-backed
       // FFI database; continuations need real windows interleaved with fake
       // pumps (M7 rhythm).

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/result.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../application/staff_session.dart';
 import '../data/staff_repository.dart';
 import '../domain/staff_user.dart';
@@ -50,11 +51,10 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
 
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : null,
-      ),
+    showAppSnack(
+      context,
+      message,
+      kind: isError ? AppSnackKind.error : AppSnackKind.info,
     );
   }
 

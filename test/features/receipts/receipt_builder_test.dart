@@ -1,3 +1,4 @@
+import 'package:qubexcore_pos/features/payments/domain/payment.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,68 @@ Map<String, String> testSettings() => <String, String>{
     };
 
 void main() {
+  test('unconfigured printer reports its actual status', () async {
+    await expectLater(
+        UnconfiguredPrinter().print([1, 2]),
+        throwsA(isA<PrinterException>()
+            .having((e) => e.message, 'message', 'Printer not configured')));
+  });
+
+  for (final width in [32, 42]) {
+    test(
+        'receipt preserves split amounts, barcode and fractional quantity at $width columns',
+        () {
+      final receipt = Receipt.fromSale(
+          sale: makeSale().copyWith(paymentMethod: 'split'),
+          items: [
+            const SaleItem(
+                uuid: 'item-long',
+                saleId: 1,
+                productId: 1,
+                productUuid: 'prod-long',
+                productName:
+                    'A very long product name that wraps across receipt paper',
+                productBarcode: '1234567890123',
+                quantity: 1.25,
+                unitPriceMinor: 600,
+                discountMinor: 0,
+                lineTotalMinor: 750,
+                createdAt: '2026-01-05T10:00:00Z')
+          ],
+          settings: testSettings(),
+          payments: const [
+            Payment(
+                uuid: 'cash',
+                saleId: 1,
+                paymentMethod: 'cash',
+                amountMinor: 500,
+                receivedMinor: 1000,
+                changeMinor: 500,
+                paidAt: '',
+                createdAt: ''),
+            Payment(
+                uuid: 'qr',
+                saleId: 1,
+                paymentMethod: 'qr',
+                amountMinor: 650,
+                reference: 'qr-ref',
+                paidAt: '',
+                createdAt: ''),
+          ]);
+      final text = utf8.decode(buildEscPosReceipt(receipt, width: width));
+      expect(receipt.lines.single.barcode, '1234567890123');
+      expect(text, contains('1234567890123'));
+      expect(text, contains('1.25 x A very long product name'));
+      expect(text, contains('Cash received'));
+      expect(text, isNot(contains('Paid')));
+      expect(text, contains('TOTAL'));
+      expect(text, contains('Total qty: 1.25'));
+      final builder = EscPosBuilder(width: width)..text('x' * (width + 5));
+      expect(utf8.decode(builder.build()),
+          startsWith('${'x' * width}\n${'x' * 5}\n'));
+    });
+  }
+
   group('formatAmount', () {
     test('formats minor units with two decimals', () {
       expect(formatAmount(0), '0.00');

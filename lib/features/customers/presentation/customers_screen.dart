@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../data/customer_repository.dart';
 import '../domain/customer.dart';
@@ -60,15 +61,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
     if (!mounted) return;
     result.when(
       success: (Customer archived) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Archived ${archived.name}')),
-        );
+        showAppSnack(context, 'Archived ${archived.name}');
         _reload();
       },
       failure: (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(failure.message)),
-        );
+        showAppSnack(context, failure.message, kind: AppSnackKind.error);
       },
     );
   }

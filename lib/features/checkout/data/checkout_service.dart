@@ -44,20 +44,12 @@ class CheckoutService {
     final existing = await _findSaleByUuid(saleUuid);
     if (existing != null && existing.id != null) {
       final existingItems = await _listItems(existing.id!);
-      final existingPayment = await _findPaymentBySaleId(existing.id!);
+      final existingPayment = await _listPaymentsBySaleId(existing.id!);
       return success(
         CheckoutOutcome(
           sale: existing,
           items: existingItems,
-          payment: existingPayment ??
-              Payment(
-                uuid: newBusinessId(),
-                saleId: existing.id!,
-                paymentMethod: existing.paymentMethod,
-                amountMinor: existing.amountPaidMinor,
-                paidAt: existing.saleAt,
-                createdAt: existing.createdAt,
-              ),
+          payments: existingPayment,
           changeMinor: existing.changeMinor,
         ),
       );
@@ -107,6 +99,9 @@ class CheckoutService {
               amountPaidMinor = totalMinor;
               changeMinor = request.cashReceivedMinor - totalMinor;
               amountDueMinor = 0;
+            case PaymentMethods.creditCard:
+            case PaymentMethods.debitCard:
+            case PaymentMethods.qr:
             case PaymentMethods.card:
               amountPaidMinor = totalMinor;
               changeMinor = 0;
@@ -115,6 +110,33 @@ class CheckoutService {
               if (cardReference != null && cardReference.isEmpty) {
                 cardReference = null;
               }
+            case PaymentMethods.split:
+              final allocations = request.allocations;
+              if (allocations.length < 2 ||
+                  allocations.map((a) => a.method).toSet().length !=
+                      allocations.length ||
+                  allocations.any((a) =>
+                      !PaymentMethods.paid.contains(a.method) ||
+                      a.amountMinor <= 0) ||
+                  allocations.fold<int>(0, (sum, a) => sum + a.amountMinor) !=
+                      totalMinor) {
+                throw _CheckoutException(
+                    'Split payments must use distinct paid methods and total the bill exactly',
+                    'invalid_split');
+              }
+              changeMinor = 0;
+              for (final a in allocations) {
+                if (a.method == PaymentMethods.cash) {
+                  if ((a.receivedMinor ?? 0) < a.amountMinor) {
+                    throw _CheckoutException(
+                        'Cash received is less than the cash allocation',
+                        'insufficient_cash');
+                  }
+                  changeMinor += a.receivedMinor! - a.amountMinor;
+                }
+              }
+              amountPaidMinor = totalMinor;
+              amountDueMinor = 0;
             case PaymentMethods.credit:
               final customerUuid = request.customerUuid;
               if (customerUuid == null || customerUuid.trim().isEmpty) {
@@ -254,27 +276,44 @@ class CheckoutService {
             itemIds.add(saleItem.copyWith(id: saleItemId));
           }
 
-          final payment = Payment(
-            uuid: newBusinessId(),
-            saleId: saleId,
-            paymentMethod: method,
-            amountMinor: method == PaymentMethods.credit
-                ? amountDueMinor
-                : amountPaidMinor,
-            reference: cardReference,
-            receivedMinor: method == PaymentMethods.cash
-                ? request.cashReceivedMinor
-                : null,
-            changeMinor: method == PaymentMethods.cash ? changeMinor : null,
-            paidAt: now,
-            staffUuid: request.staffUuid,
-            createdAt: now,
-          );
-          await txn.insert('payments', payment.toMap()..remove('id'));
+          final allocations = method == PaymentMethods.split
+              ? request.allocations
+              : [
+                  PaymentAllocation(
+                      method: method,
+                      amountMinor: method == PaymentMethods.credit
+                          ? amountDueMinor
+                          : amountPaidMinor,
+                      receivedMinor: method == PaymentMethods.cash
+                          ? request.cashReceivedMinor
+                          : null,
+                      reference: cardReference)
+                ];
+          final payments = <Payment>[];
+          for (final allocation in allocations) {
+            final payment = Payment(
+              uuid: newBusinessId(),
+              saleId: saleId,
+              paymentMethod: allocation.method,
+              amountMinor: allocation.amountMinor,
+              reference: allocation.reference?.trim(),
+              receivedMinor: allocation.method == PaymentMethods.cash
+                  ? allocation.receivedMinor
+                  : null,
+              changeMinor: allocation.method == PaymentMethods.cash
+                  ? allocation.receivedMinor! - allocation.amountMinor
+                  : null,
+              paidAt: now,
+              staffUuid: request.staffUuid,
+              createdAt: now,
+            );
+            await txn.insert('payments', payment.toMap()..remove('id'));
+            payments.add(payment);
+          }
 
           if (method == PaymentMethods.credit && customer != null) {
             final newBalance = customer.balanceMinor + amountDueMinor;
-            if (customer.creditLimitMinor <= 0) {
+            if (customer.creditLimitMinor <= 0 || !customer.creditEnabled) {
               throw _CheckoutException(
                 'Customer has no credit facility',
                 'credit_limit_exceeded',
@@ -328,11 +367,12 @@ class CheckoutService {
           return CheckoutOutcome(
             sale: Sale.fromMap(saleRows.first),
             items: itemIds,
-            payment: payment,
+            payments: payments,
             changeMinor: changeMinor,
           );
         },
       );
+      database.financialChanged();
       return success(outcome);
     } on _CheckoutException catch (e) {
       return failure(e.message, code: e.code);
@@ -343,20 +383,12 @@ class CheckoutService {
         final existingSale = await _findSaleByUuid(saleUuid);
         if (existingSale != null && existingSale.id != null) {
           final existingItems = await _listItems(existingSale.id!);
-          final existingPayment = await _findPaymentBySaleId(existingSale.id!);
+          final existingPayment = await _listPaymentsBySaleId(existingSale.id!);
           return success(
             CheckoutOutcome(
               sale: existingSale,
               items: existingItems,
-              payment: existingPayment ??
-                  Payment(
-                    uuid: newBusinessId(),
-                    saleId: existingSale.id!,
-                    paymentMethod: existingSale.paymentMethod,
-                    amountMinor: existingSale.amountPaidMinor,
-                    paidAt: existingSale.saleAt,
-                    createdAt: existingSale.createdAt,
-                  ),
+              payments: existingPayment,
               changeMinor: existingSale.changeMinor,
             ),
           );
@@ -527,15 +559,13 @@ class CheckoutService {
     return rows.map(SaleItem.fromMap).toList();
   }
 
-  Future<Payment?> _findPaymentBySaleId(int saleId) async {
+  Future<List<Payment>> _listPaymentsBySaleId(int saleId) async {
     final rows = await database.db.query(
       'payments',
       where: 'sale_id = ?',
       whereArgs: [saleId],
       orderBy: 'id ASC',
-      limit: 1,
     );
-    if (rows.isEmpty) return null;
-    return Payment.fromMap(rows.first);
+    return rows.map(Payment.fromMap).toList();
   }
 }

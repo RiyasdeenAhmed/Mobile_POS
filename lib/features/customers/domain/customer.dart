@@ -9,6 +9,11 @@ class Customer {
   final String? address;
   final int creditLimitMinor;
   final int balanceMinor;
+
+  /// Whether this customer may check out on credit. Independent of the
+  /// stored limit so a facility can be switched off without deleting the
+  /// configured limit.
+  final bool creditEnabled;
   final bool isActive;
   final bool isArchived;
   final String createdAt;
@@ -23,6 +28,7 @@ class Customer {
     this.address,
     this.creditLimitMinor = 0,
     this.balanceMinor = 0,
+    this.creditEnabled = false,
     this.isActive = true,
     this.isArchived = false,
     required this.createdAt,
@@ -41,6 +47,7 @@ class Customer {
     String? address,
     int? creditLimitMinor,
     int? balanceMinor,
+    bool? creditEnabled,
     bool? isActive,
     bool? isArchived,
     String? createdAt,
@@ -55,6 +62,7 @@ class Customer {
       address: address ?? this.address,
       creditLimitMinor: creditLimitMinor ?? this.creditLimitMinor,
       balanceMinor: balanceMinor ?? this.balanceMinor,
+      creditEnabled: creditEnabled ?? this.creditEnabled,
       isActive: isActive ?? this.isActive,
       isArchived: isArchived ?? this.isArchived,
       createdAt: createdAt ?? this.createdAt,
@@ -72,6 +80,7 @@ class Customer {
       'address': address,
       'credit_limit_minor': creditLimitMinor,
       'balance_minor': balanceMinor,
+      'credit_enabled': creditEnabled ? 1 : 0,
       'is_active': isActive ? 1 : 0,
       'is_archived': isArchived ? 1 : 0,
       'created_at': createdAt,
@@ -89,6 +98,7 @@ class Customer {
       address: map['address'] as String?,
       creditLimitMinor: (map['credit_limit_minor'] as int?) ?? 0,
       balanceMinor: (map['balance_minor'] as int?) ?? 0,
+      creditEnabled: ((map['credit_enabled'] as int?) ?? 0) == 1,
       isActive: ((map['is_active'] as int?) ?? 1) == 1,
       isArchived: ((map['is_archived'] as int?) ?? 0) == 1,
       createdAt: map['created_at'] as String,

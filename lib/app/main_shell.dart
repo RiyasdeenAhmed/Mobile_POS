@@ -62,12 +62,15 @@ class _MainShellState extends State<MainShell> {
               label: const Text('New Sale'),
             ),
       bottomNavigationBar: NavigationBar(
+        height: 72,
+        animationDuration: const Duration(milliseconds: 220),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
             label: 'Dashboard',
           ),
           NavigationDestination(

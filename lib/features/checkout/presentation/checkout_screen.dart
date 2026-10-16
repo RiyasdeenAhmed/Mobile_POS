@@ -1,3 +1,6 @@
+import '../../../core/utils/decimal_input.dart';
+import '../../../core/database/settings_repository.dart';
+import '../../../core/utils/id_generator.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -7,6 +10,7 @@ import '../../../app/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/money_text.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../checkout/domain/checkout_models.dart';
 import '../../customers/data/customer_repository.dart';
 import '../../customers/domain/customer.dart';
@@ -29,30 +33,76 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _cardReferenceController = TextEditingController();
   Customer? _selectedCustomer;
   bool _submitting = false;
+  bool _completed = false;
+  final String _saleUuid = newBusinessId();
+  bool _settingsLoaded = false;
+  final _splitControllers = {
+    for (final method in PaymentMethods.paid) method: TextEditingController()
+  };
+  final _splitReferences = {
+    for (final method in PaymentMethods.paid) method: TextEditingController()
+  };
+  int _money(String value) {
+    if (value.trim().isEmpty) return 0;
+    try {
+      return parseMoneyInput(value);
+    } on FormatException {
+      return -1;
+    }
+  }
+
+  int get _total => context.read<CartController>().totalMinor;
+  int get _cashAllocation => _paymentMethod == PaymentMethods.split
+      ? _money(_splitControllers[PaymentMethods.cash]!.text)
+      : _total;
+  List<PaymentAllocation> get _allocations => [
+        for (final entry in _splitControllers.entries)
+          if (_money(entry.value.text) > 0)
+            PaymentAllocation(
+                method: entry.key,
+                amountMinor: _money(entry.value.text),
+                receivedMinor: entry.key == PaymentMethods.cash
+                    ? _cashReceivedMinor
+                    : null,
+                reference: _splitReferences[entry.key]!.text)
+      ];
+  Future<void> _loadSettings() async {
+    try {
+      final value = await context
+          .read<SettingsRepository>()
+          .getStringOrDefault('tax_rate_bps', '0');
+      if (mounted) {
+        context.read<CartController>().setTaxRate(int.tryParse(value) ?? 0);
+        setState(() {
+          _settingsLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppSnack(context, 'Unable to load checkout settings',
+            kind: AppSnackKind.error);
+      }
+    }
+  }
+
   bool _customerLoading = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadCustomers();
+      _loadSettings();
     });
   }
 
   @override
   void dispose() {
+    for (final c in [..._splitControllers.values, ..._splitReferences.values]) {
+      c.dispose();
+    }
     _cashController.dispose();
     _cardReferenceController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadCustomers() async {
-    if (_paymentMethod != PaymentMethods.credit) return;
-    setState(() => _customerLoading = true);
-    final repository = context.read<CustomerRepository>();
-    await repository.list();
-    if (!mounted) return;
-    setState(() => _customerLoading = false);
   }
 
   static const Object _walkInChoice = Object();
@@ -60,9 +110,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _pickCustomer() async {
     setState(() => _customerLoading = true);
     final repository = context.read<CustomerRepository>();
-    final customers = await repository.list();
+    List<Customer> customers;
+    try {
+      customers = await repository.list();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _customerLoading = false);
+        showAppSnack(context, 'Unable to load customers',
+            kind: AppSnackKind.error);
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() => _customerLoading = false);
+
+    // Credit sales may only go to customers whose credit facility is on and
+    // funded; cash and card sales can attach any active customer.
+    final selectable = _paymentMethod == PaymentMethods.credit
+        ? customers
+            .where((customer) =>
+                customer.creditEnabled && customer.creditLimitMinor > 0)
+            .toList()
+        : customers;
 
     final selected = await showModalBottomSheet<Object>(
       context: context,
@@ -70,7 +139,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return SafeArea(
           child: ListView.builder(
             shrinkWrap: true,
-            itemCount: customers.length + 1,
+            itemCount: selectable.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return ListTile(
@@ -81,7 +150,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   onTap: () => Navigator.of(sheetContext).pop(_walkInChoice),
                 );
               }
-              final customer = customers[index - 1];
+              final customer = selectable[index - 1];
               return ListTile(
                 title: Text(customer.name),
                 subtitle: Text(
@@ -107,17 +176,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int _parseCashMinor(String input) {
     final trimmed = input.trim();
     if (trimmed.isEmpty) return 0;
-    return MoneyFormat.parseMajorToMinor(trimmed);
+    return _money(trimmed);
   }
 
   int get _cashReceivedMinor => _parseCashMinor(_cashController.text);
 
   bool get _canSubmit {
-    if (_submitting) return false;
+    if (_submitting || _completed || !_settingsLoaded) return false;
     final cart = context.read<CartController>();
     if (cart.isEmpty) return false;
     if (_paymentMethod == PaymentMethods.cash) {
-      return _cashReceivedMinor >= cart.totalMinor;
+      return _cashReceivedMinor >= _total;
+    }
+    if (_paymentMethod == PaymentMethods.split) {
+      return _allocations.length >= 2 &&
+          !_splitControllers.values.any((c) => _money(c.text) < 0) &&
+          _allocations.fold<int>(0, (sum, a) => sum + a.amountMinor) ==
+              _total &&
+          (_cashAllocation == 0 || _cashReceivedMinor >= _cashAllocation);
     }
     if (_paymentMethod == PaymentMethods.credit) {
       return _selectedCustomer != null;
@@ -132,10 +208,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _submitting = true);
     final request = CheckoutRequest(
       items: cart.items,
+      saleUuid: _saleUuid,
+      allocations:
+          _paymentMethod == PaymentMethods.split ? _allocations : const [],
       paymentMethod: _paymentMethod,
       cashReceivedMinor:
           _paymentMethod == PaymentMethods.cash ? _cashReceivedMinor : 0,
-      cardReference: _paymentMethod == PaymentMethods.card
+      cardReference: _paymentMethod != PaymentMethods.cash &&
+              _paymentMethod != PaymentMethods.credit
           ? _cardReferenceController.text
           : null,
       customerUuid: _selectedCustomer?.uuid,
@@ -144,16 +224,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
     final result = await service.completeSale(request);
     if (!mounted) return;
-    setState(() => _submitting = false);
     result.when(
       success: (outcome) {
+        _completed = true;
         cart.clear();
         unawaited(_finishSale(outcome));
       },
       failure: (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(failure.message)),
-        );
+        setState(() => _submitting = false);
+        showAppSnack(context, failure.message, kind: AppSnackKind.error);
       },
     );
   }
@@ -176,15 +255,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       printFailed = true;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          printFailed
-              ? 'Sale completed — printing failed'
-              : 'Sale ${outcome.sale.invoiceNumber} completed',
-        ),
-      ),
+    showAppSnack(
+      context,
+      printFailed
+          ? 'Sale completed — printing failed'
+          : 'Sale ${outcome.sale.invoiceNumber} completed',
+      kind: printFailed ? AppSnackKind.error : AppSnackKind.info,
     );
+    setState(() => _submitting = false);
     await AppNavigator.toReceipt(
       context,
       saleUuid: outcome.sale.uuid,
@@ -196,162 +274,238 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final theme = Theme.of(context);
     final cart = context.watch<CartController>();
     final totals = cart.totals;
-    final changeMinor = _paymentMethod == PaymentMethods.cash
-        ? (_cashReceivedMinor - totals.totalMinor)
+    final changeMinor = _paymentMethod == PaymentMethods.cash ||
+            _paymentMethod == PaymentMethods.split
+        ? (_cashReceivedMinor - _cashAllocation)
         : 0;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Checkout')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return PopScope(
+        canPop: !_submitting,
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Take payment')),
+          bottomNavigationBar: Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom),
+              child: SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.all(16),
+                  child: FilledButton(
+                      onPressed: _canSubmit ? _completeSale : null,
+                      child: Text(
+                          _submitting ? 'Completing...' : 'Complete sale')))),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Amount due', style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 8),
+                      MoneyText(
+                        amountMinor: _total,
+                        style: MoneyTextStyle.moneyLarge(context),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      _AmountRow(
+                          label: 'Subtotal', amountMinor: totals.subtotalMinor),
+                      _AmountRow(
+                        label: 'Discount',
+                        amountMinor: totals.discountMinor,
+                      ),
+                      _AmountRow(label: 'Tax', amountMinor: totals.taxMinor),
+                      const Divider(),
+                      _AmountRow(
+                        label: 'Total',
+                        amountMinor: _total,
+                        emphasize: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Payment method', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Text('Amount due', style: theme.textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  MoneyText(
-                    amountMinor: totals.totalMinor,
-                    style: MoneyTextStyle.moneyLarge(context),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  _AmountRow(
-                      label: 'Subtotal', amountMinor: totals.subtotalMinor),
-                  _AmountRow(
-                    label: 'Discount',
-                    amountMinor: totals.discountMinor,
-                  ),
-                  _AmountRow(label: 'Tax', amountMinor: totals.taxMinor),
-                  const Divider(),
-                  _AmountRow(
-                    label: 'Total',
-                    amountMinor: totals.totalMinor,
-                    emphasize: true,
-                  ),
+                  for (final method in const [
+                    PaymentMethods.cash,
+                    PaymentMethods.creditCard,
+                    PaymentMethods.debitCard,
+                    PaymentMethods.qr,
+                    PaymentMethods.split,
+                    PaymentMethods.credit,
+                  ])
+                    ChoiceChip(
+                      label: Text(PaymentMethods.labelOf(method)),
+                      selected: _paymentMethod == method,
+                      onSelected: _submitting
+                          ? null
+                          : (_) {
+                              setState(() {
+                                _paymentMethod = method;
+                              });
+                            },
+                      selectedColor:
+                          QubeXCoreColors.primaryBlue.withValues(alpha: 0.2),
+                      avatar: Icon(
+                        switch (method) {
+                          PaymentMethods.cash => Icons.payments_outlined,
+                          PaymentMethods.qr => Icons.qr_code,
+                          PaymentMethods.split => Icons.call_split,
+                          PaymentMethods.credit =>
+                            Icons.account_balance_outlined,
+                          _ => Icons.credit_card_outlined,
+                        },
+                        size: 18,
+                        color: _paymentMethod == method
+                            ? QubeXCoreColors.primaryBlue
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('Payment method', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final method in const [
-                PaymentMethods.cash,
-                PaymentMethods.card,
-                PaymentMethods.credit,
-              ])
-                ChoiceChip(
-                  label: Text(PaymentMethods.labelOf(method)),
-                  selected: _paymentMethod == method,
-                  onSelected: _submitting
-                      ? null
-                      : (_) {
-                          setState(() {
-                            _paymentMethod = method;
-                          });
-                          if (method == PaymentMethods.credit) {
-                            _loadCustomers();
-                          }
-                        },
-                  selectedColor:
-                      QubeXCoreColors.warningOrange.withValues(alpha: 0.2),
-                  avatar: Icon(
-                    method == PaymentMethods.cash
-                        ? Icons.payments_outlined
-                        : method == PaymentMethods.card
-                            ? Icons.credit_card_outlined
-                            : Icons.account_balance_outlined,
-                    size: 18,
-                    color: _paymentMethod == method
-                        ? QubeXCoreColors.warningOrange
-                        : theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: 16),
+              if (_paymentMethod == PaymentMethods.split) ...[
+                const Text(
+                    'Allocate the full total between at least two payment methods.'),
+                for (final entry in _splitControllers.entries) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                      controller: entry.value,
+                      enabled: !_submitting,
+                      decoration: InputDecoration(
+                          labelText:
+                              '${PaymentMethods.labelOf(entry.key)} amount',
+                          errorText: _money(entry.value.text) < 0
+                              ? 'Enter a valid amount'
+                              : null),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setState(() {})),
+                  if (entry.key != PaymentMethods.cash &&
+                      _money(entry.value.text) > 0)
+                    TextField(
+                        controller: _splitReferences[entry.key],
+                        enabled: !_submitting,
+                        decoration: InputDecoration(
+                            labelText:
+                                '${PaymentMethods.labelOf(entry.key)} reference (optional)')),
+                ],
+                _AmountRow(
+                    label: 'Remaining to allocate',
+                    amountMinor: _total -
+                        _allocations.fold<int>(
+                            0, (sum, a) => sum + a.amountMinor)),
+              ],
+              if (_paymentMethod == PaymentMethods.cash ||
+                  (_paymentMethod == PaymentMethods.split &&
+                      _cashAllocation > 0)) ...[
+                TextField(
+                  controller: _cashController,
+                  enabled: !_submitting,
+                  decoration: InputDecoration(
+                    errorText: _cashReceivedMinor < 0
+                        ? 'Enter a valid amount with up to two decimals'
+                        : null,
+                    labelText: 'Cash received',
+                    hintText: '0.00',
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, children: [
+                  for (final amount in [0, 10000, 50000])
+                    OutlinedButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => setState(() {
+                                  final value = amount == 0
+                                      ? _cashAllocation
+                                      : (_cashReceivedMinor < 0
+                                              ? 0
+                                              : _cashReceivedMinor) +
+                                          amount;
+                                  _cashController.text =
+                                      '${value ~/ 100}.${(value % 100).toString().padLeft(2, '0')}';
+                                }),
+                        child: Text(amount == 0
+                            ? 'Exact'
+                            : '+${MoneyFormat.format(amount)}')),
+                ]),
+                _AmountRow(
+                  label: 'Change',
+                  amountMinor: changeMinor < 0 ? 0 : changeMinor,
+                ),
+              ],
+              if (PaymentMethods.paid.contains(_paymentMethod) &&
+                  _paymentMethod != PaymentMethods.cash) ...[
+                TextField(
+                  controller: _cardReferenceController,
+                  enabled: !_submitting,
+                  decoration: const InputDecoration(
+                    labelText: 'Payment reference (optional)',
+                    prefixIcon: Icon(Icons.credit_card_outlined),
+                  ),
+                ),
+              ],
+              TextFormField(
+                  initialValue: cart.note,
+                  enabled: !_submitting,
+                  decoration:
+                      const InputDecoration(labelText: 'Sale note (optional)'),
+                  onChanged: (value) => cart.note = value),
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.person_outline),
+                  title: Text(
+                    _selectedCustomer?.name ?? 'Walk-in customer',
+                  ),
+                  subtitle: _selectedCustomer != null
+                      ? Text(
+                          'Balance ${MoneyFormat.format(_selectedCustomer!.balanceMinor)} · '
+                          'Limit ${MoneyFormat.format(_selectedCustomer!.creditLimitMinor)}',
+                        )
+                      : Text(
+                          _paymentMethod == PaymentMethods.credit
+                              ? 'Required for credit sales'
+                              : 'No customer account — cash sale',
+                        ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _submitting || _customerLoading ? null : _pickCustomer,
+                ),
+              ),
+              if (_customerLoading)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: LinearProgressIndicator(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              const SizedBox(height: 24),
+              if (cart.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(
+                    'Add products to the cart before checkout.',
+                    style: theme.textTheme.bodySmall,
+                    textAlign: TextAlign.center,
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (_paymentMethod == PaymentMethods.cash) ...[
-            TextField(
-              controller: _cashController,
-              enabled: !_submitting,
-              decoration: const InputDecoration(
-                labelText: 'Cash received',
-                hintText: '0.00',
-                prefixIcon: Icon(Icons.payments_outlined),
-              ),
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 8),
-            _AmountRow(
-              label: 'Change',
-              amountMinor: changeMinor < 0 ? 0 : changeMinor,
-            ),
-          ],
-          if (_paymentMethod == PaymentMethods.card) ...[
-            TextField(
-              controller: _cardReferenceController,
-              enabled: !_submitting,
-              decoration: const InputDecoration(
-                labelText: 'Card reference (optional)',
-                prefixIcon: Icon(Icons.credit_card_outlined),
-              ),
-            ),
-          ],
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: Text(
-                _selectedCustomer?.name ?? 'Walk-in customer',
-              ),
-              subtitle: _selectedCustomer != null
-                  ? Text(
-                      'Balance ${MoneyFormat.format(_selectedCustomer!.balanceMinor)} · '
-                      'Limit ${MoneyFormat.format(_selectedCustomer!.creditLimitMinor)}',
-                    )
-                  : Text(
-                      _paymentMethod == PaymentMethods.credit
-                          ? 'Required for credit sales'
-                          : 'No customer account — cash sale',
-                    ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _submitting ? null : _pickCustomer,
-            ),
-          ),
-          if (_customerLoading)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: LinearProgressIndicator(
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _canSubmit ? _completeSale : null,
-            child: Text(_submitting ? 'Completing...' : 'Complete sale'),
-          ),
-          if (cart.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(
-                'Add products to the cart before checkout.',
-                style: theme.textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-            ),
-        ],
-      ),
-    );
+        ));
   }
 }
 

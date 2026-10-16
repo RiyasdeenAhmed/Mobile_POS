@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/money_text.dart';
+import '../../../core/widgets/app_snack.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/product_tile.dart';
 import '../../categories/data/category_repository.dart';
 import '../../categories/domain/category.dart';
 import '../../products/data/product_repository.dart';
@@ -71,11 +73,12 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
           '${product.stockQuantity.toStringAsFixed(0)} in stock',
       CartChangeResult.outOfStock => '${product.name} is out of stock',
     };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(milliseconds: 1200),
-      ),
+    showAppSnack(
+      context,
+      message,
+      kind: result == CartChangeResult.outOfStock
+          ? AppSnackKind.error
+          : AppSnackKind.info,
     );
   }
 
@@ -167,48 +170,33 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                           child: const Text('Manage products'),
                         ),
                       )
-                    : ListView.separated(
-                        itemCount: visible.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final product = visible[index];
-                          final out =
-                              product.trackStock && product.stockQuantity <= 0;
-                          final low = product.trackStock &&
-                              product.reorderLevel > 0 &&
-                              product.stockQuantity <= product.reorderLevel;
-                          final stockColor = out
-                              ? const Color(0xFFB00020)
-                              : low
-                                  ? const Color(0xFFB86E00)
-                                  : theme.colorScheme.outline;
-                          return ListTile(
-                            title: Text(product.name),
-                            subtitle: Text(
-                              [
-                                if (product.sku != null) product.sku!,
-                                if (product.barcode != null) product.barcode!,
-                                product.trackStock
-                                    ? 'Stock ${product.stockQuantity.toStringAsFixed(0)}'
-                                        '${out ? ' · Out of stock' : low ? ' · Low stock' : ''}'
-                                    : 'Not tracked',
-                              ].join(' · '),
-                              style: TextStyle(color: stockColor),
-                            ),
-                            trailing: MoneyText(
-                              amountMinor: product.sellingPriceMinor,
-                              style: theme.textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            onTap: out ? null : () => _addToCart(product),
-                          );
-                        },
-                      ),
+                    : LayoutBuilder(builder: (context, constraints) {
+                        final scale = MediaQuery.textScalerOf(context).scale(1);
+                        final columns = constraints.maxWidth < 350 ||
+                                scale > 1.3
+                            ? 1
+                            : (constraints.maxWidth / 190).floor().clamp(2, 5);
+                        return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: visible.length,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: columns,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    mainAxisExtent: 235 * scale),
+                            itemBuilder: (context, index) {
+                              final product = visible[index];
+                              return ProductTile(
+                                  product: product,
+                                  onAdd: () => _addToCart(product));
+                            });
+                      }),
           ),
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               border: Border(top: BorderSide(color: theme.dividerColor)),
             ),
             child: SafeArea(
@@ -231,8 +219,8 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                   FilledButton(
                     onPressed: cart.isEmpty
                         ? null
-                        : () => AppNavigator.toCart(context),
-                    child: const Text('View Cart'),
+                        : () => AppNavigator.toCheckout(context),
+                    child: const Text('Pay'),
                   ),
                 ],
               ),

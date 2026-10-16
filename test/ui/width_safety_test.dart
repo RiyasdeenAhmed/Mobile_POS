@@ -154,7 +154,7 @@ void main() {
           .hideCurrentSnackBar();
       await tester.pumpAndSettle();
 
-      await pushSettle(tester, find.text('View Cart'));
+      await pushSettle(tester, find.byTooltip('Cart'));
       expect(find.text('Proceed to Checkout'), findsOneWidget);
       expectNoOverflow(tester, 'cart');
 
@@ -175,7 +175,7 @@ void main() {
 
       await tester.pumpWidget(app(const LoginScreen()));
       await settle(tester);
-      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.text('Enter PIN'), findsOneWidget);
       expectNoOverflow(tester, 'login');
 
       await tester.pumpWidget(app(const SettingsScreen()));

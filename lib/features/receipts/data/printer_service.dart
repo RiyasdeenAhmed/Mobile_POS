@@ -11,3 +11,10 @@ class PrinterException implements Exception {
   @override
   String toString() => 'PrinterException: $message';
 }
+
+class UnconfiguredPrinter implements PrinterService {
+  @override
+  Future<void> print(List<int> job) async {
+    throw const PrinterException('Printer not configured');
+  }
+}

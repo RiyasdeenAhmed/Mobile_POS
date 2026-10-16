@@ -53,6 +53,22 @@ class MoreScreen extends StatelessWidget {
               session.isAdmin ? 'Administrator' : 'Cashier',
             ),
           ),
+        if (session.isAdmin) ...[
+          ListTile(
+              leading: const Icon(Icons.insights),
+              title: const Text('Profit'),
+              subtitle: const Text('Daily and monthly gross and net profit'),
+              onTap: () => AppNavigator.pushNamed(context, AppRoutes.profit)),
+          ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: const Text('Expenses'),
+              onTap: () => AppNavigator.pushNamed(context, AppRoutes.expenses)),
+        ],
+        ListTile(
+            leading: const Icon(Icons.barcode_reader),
+            title: const Text('Barcode Labels'),
+            onTap: () =>
+                AppNavigator.pushNamed(context, AppRoutes.barcodeLabels)),
         ListTile(
           leading: const Icon(Icons.settings_outlined),
           title: const Text('Settings'),

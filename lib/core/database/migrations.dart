@@ -36,12 +36,51 @@ const MigrationStep migrationV4 = MigrationStep(
   up: _migrateToV4,
 );
 
+const MigrationStep migrationV5 = MigrationStep(
+  version: 5,
+  name: 'customer_credit_enabled',
+  up: _migrateToV5,
+);
+
 const List<MigrationStep> kMigrations = <MigrationStep>[
   migrationV1,
   migrationV2,
   migrationV3,
   migrationV4,
+  migrationV5,
+  migrationV6,
+  migrationV7,
+  migrationV8,
 ];
+
+const migrationV8 = MigrationStep(
+  version: 8,
+  name: 'staff_pin_lengths_and_printer_settings',
+  up: _migrateToV8,
+);
+
+Future<void> _migrateToV8(DatabaseExecutor db) async {
+  await db.execute(
+    'ALTER TABLE staff_users ADD COLUMN pin_length INTEGER NOT NULL DEFAULT 4',
+  );
+  await db.execute(
+    "INSERT OR IGNORE INTO app_settings(key, value, updated_at) VALUES ('printer_address', '', datetime('now'))",
+  );
+  await db.execute(
+    "INSERT OR IGNORE INTO app_settings(key, value, updated_at) VALUES ('business_logo_path', '', datetime('now'))",
+  );
+}
+
+Future<void> _migrateToV5(DatabaseExecutor db) async {
+  await db.execute(
+    'ALTER TABLE customers ADD COLUMN credit_enabled INTEGER NOT NULL DEFAULT 0',
+  );
+  // Existing customers that had a credit limit were operating on credit, so
+  // keep their facility active after the flag is introduced.
+  await db.execute(
+    'UPDATE customers SET credit_enabled = 1 WHERE credit_limit_minor > 0',
+  );
+}
 
 Future<void> _migrateToV3(DatabaseExecutor db) async {
   await db.execute('''
@@ -168,7 +207,7 @@ Future<void> _migrateToV2(DatabaseExecutor db) async {
     {'key': 'allow_negative_stock', 'value': '0'},
     {'key': 'printer_enabled', 'value': '0'},
     {'key': 'printer_name', 'value': ''},
-    {'key': 'printer_width', 'value': '32'},
+    {'key': 'printer_width', 'value': '42'},
   ];
   for (final row in settings) {
     await db.insert(
@@ -494,4 +533,88 @@ class MigrationRunner {
     );
     return rows.map((row) => row['version'] as int).toSet();
   }
+}
+
+const migrationV6 =
+    MigrationStep(version: 6, name: 'auditable_expenses', up: _migrateToV6);
+Future<void> _migrateToV6(DatabaseExecutor db) async {
+  await db.execute("""CREATE TABLE expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL UNIQUE,
+    amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+    category TEXT NOT NULL, expense_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
+    staff_uuid TEXT, created_at TEXT NOT NULL, replaces_id INTEGER REFERENCES expenses(id),
+    voided_at TEXT, voided_by TEXT, void_reason TEXT
+  )""");
+  await db.execute('CREATE INDEX idx_expenses_date ON expenses(expense_at)');
+}
+
+const migrationV7 = MigrationStep(
+  version: 7,
+  name: 'operations_security_foundation',
+  up: _migrateToV7,
+);
+
+Future<void> _migrateToV7(DatabaseExecutor db) async {
+  await db.execute('''
+    CREATE TABLE audit_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      event_type TEXT NOT NULL,
+      actor_staff_uuid TEXT,
+      entity_type TEXT,
+      entity_id TEXT,
+      details TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL
+    )
+  ''');
+  await db.execute(
+    'CREATE INDEX idx_audit_events_created_at ON audit_events(created_at)',
+  );
+  await db.execute('''
+    CREATE TABLE backup_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      path TEXT NOT NULL,
+      checksum TEXT NOT NULL,
+      schema_version INTEGER NOT NULL,
+      app_version TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      completed_at TEXT,
+      error TEXT
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE stocktakes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL,
+      note TEXT,
+      staff_uuid TEXT,
+      started_at TEXT NOT NULL,
+      completed_at TEXT
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE stocktake_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      stocktake_uuid TEXT NOT NULL,
+      product_id INTEGER NOT NULL,
+      product_uuid TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      expected_quantity REAL NOT NULL,
+      counted_quantity REAL NOT NULL,
+      variance REAL NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  ''');
+  await db.execute(
+    "INSERT OR IGNORE INTO app_settings(key, value, updated_at) VALUES ('tap_to_pay_enabled', '0', datetime('now'))",
+  );
+  await db.execute(
+    "INSERT OR IGNORE INTO app_settings(key, value, updated_at) VALUES ('session_timeout_minutes', '0', datetime('now'))",
+  );
+  await db.execute(
+    "INSERT OR IGNORE INTO app_settings(key, value, updated_at) VALUES ('backup_retention', '5', datetime('now'))",
+  );
 }
